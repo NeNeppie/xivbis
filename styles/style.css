@@ -1,0 +1,43 @@
+body {
+  font-family: monospace;
+  background-attachment: fixed;
+  background: #221c22;
+  background: linear-gradient(to bottom, #221c22 50%, #47176e);
+  color: aliceblue;
+}
+
+label {
+  display: block;
+  margin-bottom: 5px;
+  margin-top: 10px;
+}
+
+select {
+  background-color: #221c22;
+  color: aliceblue;
+  border-radius: 10px;
+  border-color: #3d313d;
+  padding: 10px;
+  font-size: medium;
+}
+
+.stats {
+  bottom: 41%;
+  position: absolute;
+}
+
+.pair {
+  text-align: center;
+  position: relative;
+}
+
+.pair-right,
+.pair-left {
+  display: inline-block;
+}
+
+#item-stats {
+  white-space: pre;
+  font-size: small;
+  font-weight: bolder;
+}

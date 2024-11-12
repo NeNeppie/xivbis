@@ -1,0 +1,162 @@
+import { jobs } from "./constants/jobstats.js";
+import { jobModifiers, levelModifiers, tribalStats } from "./constants/modifiers.js";
+import { cel, flr, sumObjectsByKey } from "./utils/mathutils.js";
+
+function calcBaseAttribute(lv, job, tribe, stat) {
+  const tribeStat = tribalStats[tribe][stat];
+  const attribute = levelModifiers[lv].main * jobModifiers[job][stat];
+  return flr(attribute) + tribeStat;
+}
+
+export function getBaseStats(lv, job, tribe = "default") {
+  // prettier-ignore
+  return {
+    "Strength": calcBaseAttribute(lv, job, tribe, "strength"),
+    "Dexterity": calcBaseAttribute(lv, job, tribe, "dexterity"),
+    "Intelligence": calcBaseAttribute(lv, job, tribe, "intelligence"),
+    "Mind": calcBaseAttribute(lv, job, tribe, "mind"),
+    "Vitality": calcBaseAttribute(lv, job, tribe, "vitality"),
+    "Determination": levelModifiers[lv].main,
+    "Tenacity": levelModifiers[lv].sub,
+    "Critical Hit": levelModifiers[lv].sub,
+    "Direct Hit Rate": levelModifiers[lv].sub,
+    "Skill Speed": levelModifiers[lv].sub,
+    "Spell Speed": levelModifiers[lv].sub,
+    "Piety": levelModifiers[lv].sub,
+  };
+}
+
+function calcHealth(job, lv, statVIT) {
+  const healthModifier = jobModifiers[job].health;
+  const baseHealth = levelModifiers[lv].HP * healthModifier;
+  let vitalityParam = statVIT - levelModifiers[lv].main;
+
+  vitalityParam *= jobs[job].role === "tank" ? levelModifiers[lv].mhpTank : levelModifiers[lv].mhpNormal;
+
+  return flr(baseHealth + vitalityParam);
+}
+
+/**
+ * Calculates the modifier for a given main stat.
+ * @param {number} lv Supported character level
+ * @param {number} stat Desired main stat
+ * @param {number} coefficient Main Stat coefficient. Differs per stat formula.
+ * @returns
+ */
+function getMainstatModifier(lv, stat, coefficient) {
+  return flr((coefficient * (stat - levelModifiers[lv].main)) / levelModifiers[lv].div);
+}
+
+/**
+ * Calculates the modifier for a given substat.
+ * @param {number} lv Supported character level
+ * @param {number} substat Desired substat
+ * @param {number} coefficient Substat coefficient. Differs per substat formula.
+ * @returns
+ */
+function getSubstatModifier(lv, substat, coefficient) {
+  return flr((coefficient * (substat - levelModifiers[lv].sub)) / levelModifiers[lv].div);
+}
+
+function getDirectHitRate(lv, statDirect) {
+  return getSubstatModifier(lv, statDirect, 550) / 10;
+}
+
+function getCritHitRate(lv, statCrit) {
+  return (50 + getSubstatModifier(lv, statCrit, 200)) / 10;
+}
+
+function getCritMultiplier(lv, statCrit) {
+  return (1400 + getSubstatModifier(lv, statCrit, 200)) / 1000;
+}
+
+function getWeaponDamageMultiplier(lv, job, weaponDamage, isAuto = false) {
+  const attribute = isAuto ? jobs[job].autoStat : jobs[job].mainStat;
+  const statModifier = jobModifiers[job][attribute];
+  return flr((levelModifiers[lv].main * statModifier) / 10 + weaponDamage);
+}
+
+function getAutoAttackModifier(lv, job, weaponDamage, delay) {
+  return flr(getWeaponDamageMultiplier(lv, job, weaponDamage, true) * (delay / 3));
+}
+
+function getAttackPower(lv, job, attribute) {
+  const coefficient = jobs[job].role === "tank" ? 190 : 237;
+  const baseMult = (coefficient * (attribute - levelModifiers[lv].main)) / levelModifiers[lv].main;
+  return ((100 + baseMult) | 0) / 100;
+}
+
+function getDeterminationMultiplier(lv, statDET) {
+  return (1000 + getMainstatModifier(lv, statDET, 140)) / 1000;
+}
+
+function getSpeedMultiplier(lv, statSpeed) {
+  return (1000 + getSubstatModifier(lv, statSpeed, 130)) / 1000;
+}
+
+function getTenacityMultiplier(lv, job, statTNC) {
+  if (jobs[job].role === "tank") {
+    return (1000 + getSubstatModifier(lv, statTNC, 112)) / 1000;
+  }
+  return 1;
+}
+
+/** `cooldown` is in seconds. Simplified version */
+function getGlobalCoolDown(lv, statSpeed, baseGCD) {
+  // getSubstatMultiplier() but Ceiled instead of Floored.
+  const speed = cel((130 * (statSpeed - levelModifiers[lv].sub)) / levelModifiers[lv].div);
+  return flr((baseGCD * (1000 + speed)) / 1000);
+}
+
+/** Basic function for damage calculation. */
+export function calculateBaseDamage(lv, job, stats, potency = 100, isAuto = false, isDot = false, autoDH = false) {
+  const attribute = isAuto ? stats[jobs[job].autoStat] : stats[jobs[job].mainStat];
+  const speedStat = isAuto /* || attackType === Weaponskill */ ? stats.spdSkill : stats.spdSpell;
+
+  const multiplierSPD = isAuto || isDot ? getSpeedMultiplier(lv, job, speedStat) : 1.0;
+  const multiplierAP = getAttackPower(lv, job, attribute);
+  const multiplierDET = getDeterminationMultiplier(lv, stats.determination);
+  const multiplierTNC = getTenacityMultiplier(lv, job, stats.tenacity);
+  // TODO: Distinguish between Physical (Weaponskill) & Magical (Spell). Abilities?
+  const multiplierWD = isAuto
+    ? getAutoAttackModifier(lv, job, stats.wdPhys, stats.delay)
+    : getWeaponDamageMultiplier(lv, job, stats.wdPhys);
+
+  potency = isAuto ? jobs[job].autoPotency : potency;
+  let damage = flr((potency / 100) * multiplierWD * flr(multiplierAP * multiplierDET, 2)) * multiplierTNC * multiplierSPD;
+  console.log(
+    `DMG = (${potency}p * ${multiplierWD}wd * (${multiplierAP}ap * ${multiplierDET}det)) * ${multiplierTNC}tnc (* ${multiplierSPD}spd)`
+  );
+
+  const trait = jobs[job].traitBonus;
+  if (typeof trait !== "undefined") {
+    damage *= trait;
+  }
+  if (potency < 100) {
+    damage += 1;
+  }
+
+  // TODO: Research standard deviation / uniform distribution
+  //return D2 * (getRandomInt(95, 105) / 100) /* * getBuffs() calculate afterwards */;
+  damage = applyCritDh(lv, damage, stats);
+  return flr(damage, 2);
+}
+
+/**
+ * Calculates the average damage of an action after taking critical hits and direct hits into account.
+ * @param {number} lv Supported character level
+ * @param {number} baseDamage Action damage before RNG
+ * @param {*} stats Character stats structure. Used: `crit` and `directHit`
+ * @returns Average action damage w/ critical and direct hits, floored down to the hundredth
+ */
+export function applyCritDh(lv, baseDamage, stats) {
+  const multiplierCrit = getCritMultiplier(lv, stats.crit);
+  const probabilityCrit = getCritHitRate(lv, stats.crit) / 100;
+  const probabilityDirect = getDirectHitRate(lv, stats.directHit) / 100;
+
+  console.log(`critRate: ${probabilityCrit}, directRate: ${probabilityDirect}, critMult: ${multiplierCrit}`);
+
+  const directHit = 1 + probabilityDirect * 0.25;
+  const criticalHit = 1 + probabilityCrit * (multiplierCrit - 1);
+  return flr(baseDamage * directHit * criticalHit, 2);
+}

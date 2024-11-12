@@ -1,0 +1,8 @@
+.vs/
+.vscode/
+obj/
+bin/
+*.user
+*.sln
+
+Site Building Exercise/
