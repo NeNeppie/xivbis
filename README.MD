@@ -53,4 +53,4 @@ Implmenting an algorithm that solves for BiS given "targets" and "limits"
 ## Bugs, Issues & Todo
 
 - node.js command-line arguments?
--
+- Frontend mobile layout

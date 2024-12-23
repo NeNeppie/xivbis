@@ -112,7 +112,7 @@ class GearItem {
         `Couldn't create GearItem from xivapi entry '${item.Name}: Item is a Soulstone. EquipSlotCategory=${equipmentID}`
       );
     }
-    this.internalID = item.ID;
+    this.id = item.ID;
     this.name = item.Name;
     this.iconPath = item.Icon.path_hr1;
     this.equipLevel = item.LevelEquip;

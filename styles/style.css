@@ -1,8 +1,8 @@
 body {
   font-family: monospace;
   background-attachment: fixed;
-  background: #221c22;
-  background: linear-gradient(to bottom, #221c22 50%, #47176e);
+  background: hsl(50, 10%, 12%);
+  background: linear-gradient(to bottom, hsl(50, 5%, 7%) 90%, #6e5b17);
   color: aliceblue;
 }
 
@@ -12,32 +12,91 @@ label {
   margin-top: 10px;
 }
 
-select {
-  background-color: #221c22;
-  color: aliceblue;
-  border-radius: 10px;
-  border-color: #3d313d;
-  padding: 10px;
-  font-size: medium;
+th {
+  text-align: left;
+  padding: 5px;
 }
 
-.stats {
-  bottom: 41%;
-  position: absolute;
+td {
+  img {
+    height: 1.5rem;
+    vertical-align: middle; /* Should just be set globally */
+  }
+  text-align: left;
+  vertical-align: middle;
 }
 
-.pair {
+.gear-pairs {
   text-align: center;
+  justify-content: center;
   position: relative;
+  display: flex;
+  flex-wrap: wrap;
 }
 
-.pair-right,
-.pair-left {
-  display: inline-block;
+#gear-pair-right,
+#gear-pair-left {
+  display: block;
+  margin-left: 10px;
+  margin-right: 10px;
 }
 
 #item-stats {
   white-space: pre;
   font-size: small;
   font-weight: bolder;
+}
+
+.overflow {
+  text-overflow: ellipsis;
+  text-wrap: nowrap;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+table.tb {
+  --inner-border-width: 0.0625rem;
+  --cell-padding: 10px;
+  --selected-cell-padding: calc(var(--cell-padding) - var(--inner-border-width));
+
+  table-layout: fixed;
+  background-color: #1e1e1e;
+  border-collapse: separate;
+  border-color: #6b604a;
+  border-radius: 0.625rem;
+  border-spacing: 0;
+  border-style: solid;
+  border-width: 0.125rem;
+  width: 450px;
+  font-family: sans-serif;
+
+  tr {
+    height: 1.6rem;
+  }
+
+  td {
+    padding: 0px var(--cell-padding) 0px var(--cell-padding);
+  }
+
+  tr.selected {
+    background-color: #ffd70022;
+
+    td {
+      border: var(--inner-border-width) solid #ffd700;
+      border-style: solid none;
+    }
+
+    td:first-child {
+      border-left-style: solid;
+      border-top-left-radius: 0.625rem;
+      border-bottom-left-radius: 0.625rem;
+      padding-left: var(--selected-cell-padding);
+    }
+    td:last-child {
+      border-right-style: solid;
+      border-top-right-radius: 0.625rem;
+      border-bottom-right-radius: 0.625rem;
+      padding-right: var(--selected-cell-padding);
+    }
+  }
 }
