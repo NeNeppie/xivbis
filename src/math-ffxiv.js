@@ -1,6 +1,6 @@
 import { jobs } from "./constants/jobstats.js";
 import { jobModifiers, levelModifiers, tribalStats } from "./constants/modifiers.js";
-import { cel, flr, sumObjectsByKey } from "./utils/mathutils.js";
+import { cel, flr, sumObjectsByKey } from "./utils/math-utils.js";
 
 function calcBaseAttribute(lv, job, tribe, stat) {
   const tribeStat = tribalStats[tribe][stat];
@@ -81,7 +81,7 @@ function getAutoAttackModifier(lv, job, weaponDamage, delay) {
 }
 
 function getAttackPower(lv, job, attribute) {
-  const coefficient = jobs[job].role === "tank" ? 190 : 237;
+  const coefficient = jobs[job].role === "tank" ? levelModifiers[lv].mapTank : levelModifiers[lv].mapNormal;
   const baseMult = (coefficient * (attribute - levelModifiers[lv].main)) / levelModifiers[lv].main;
   return ((100 + baseMult) | 0) / 100;
 }
