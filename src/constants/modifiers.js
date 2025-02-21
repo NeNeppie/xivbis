@@ -50,10 +50,10 @@ export const jobModifiers = {
 
 // prettier-ignore
 export const levelModifiers = {
-  50:  { main: 202, sub: 341, div: 341,  HP: 1400, mhpNormal: 11.2, mhpTank: 15.5 },
-  60:  { main: 218, sub: 354, div: 600,  HP: 1500, mhpNormal: 12.9, mhpTank: 17.5},
-  70:  { main: 292, sub: 364, div: 900,  HP: 1700, mhpNormal: 14,   mhpTank: 18.8 },
-  80:  { main: 340, sub: 380, div: 1300, HP: 2000, mhpNormal: 18.8, mhpTank: 26.6 },
-  90:  { main: 390, sub: 400, div: 1900, HP: 3000, mhpNormal: 24.3, mhpTank: 34.6 },
-  100: { main: 440, sub: 420, div: 2780, HP: 4000, mhpNormal: 30.1, mhpTank: 43 },
+  50:  { main: 202, sub: 341, div: 341,  HP: 1400, mhpNormal: 11.2, mhpTank: 15.5, mapNormal: 75 , mapTank: 85  },
+  60:  { main: 218, sub: 354, div: 600,  HP: 1500, mhpNormal: 12.9, mhpTank: 17.5, mapNormal: 100, mapTank: 95  },
+  70:  { main: 292, sub: 364, div: 900,  HP: 1700, mhpNormal: 14,   mhpTank: 18.8, mapNormal: 125, mapTank: 105 },
+  80:  { main: 340, sub: 380, div: 1300, HP: 2000, mhpNormal: 18.8, mhpTank: 26.6, mapNormal: 165, mapTank: 115 },
+  90:  { main: 390, sub: 400, div: 1900, HP: 3000, mhpNormal: 24.3, mhpTank: 34.6, mapNormal: 195, mapTank: 157 },
+  100: { main: 440, sub: 420, div: 2780, HP: 4000, mhpNormal: 30.1, mhpTank: 43,   mapNormal: 237, mapTank: 190 },
 };

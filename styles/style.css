@@ -69,16 +69,24 @@ table.tb {
   border-width: 0.125rem;
   width: 450px;
   font-family: sans-serif;
+  font-size: 0.9rem;
+  padding-bottom: 0.4375rem;
 
   tr {
     height: 1.6rem;
+    transition: background 0.2s;
   }
 
   td {
     padding: 0px var(--cell-padding) 0px var(--cell-padding);
   }
 
+  tr:nth-child(2n + 3) {
+    background-color: #272727;
+  }
+
   tr.selected {
+    background-blend-mode: darken;
     background-color: #ffd70022;
 
     td {
@@ -99,4 +107,12 @@ table.tb {
       padding-right: var(--selected-cell-padding);
     }
   }
+
+  tr:not(:first-child):hover {
+    background: #ffd70033;
+  }
+}
+
+h1 {
+  color: #ffd700;
 }

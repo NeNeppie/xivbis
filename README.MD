@@ -21,7 +21,7 @@ The foundation. Stat & Damage calculations
     - Support for party buffs (all types)
     - Trait bonus for SCH and SMN pets (+30%) [3]
     - Healing and HP calculations
-    - Support for ALL Equipment levels
+    🟨 Support for ALL Equipment levels
 
 ### Gearset stage `[2]`:
 
@@ -31,12 +31,13 @@ The logic stage that binds all systems together via "Gearsets"
 
     ✅ Getting item list [2.1]
     ✅ Link items to stats [2.2]
-    - "Build" gearset [2.3]
+    ✅ "Build" gearset [2.3]
         ✅ Adding items
-        - Removing items
+        ✅ Removing items
         ✅ Stat calculation
     - Support for materia [2.2/2.3]
     - Support for food / potions [2.2/2.3]
+    - Item Stat display + Total Stat display redesign [2.3]
 
 ### Rotation stage `[3]`:
 
@@ -53,4 +54,6 @@ Implmenting an algorithm that solves for BiS given "targets" and "limits"
 ## Bugs, Issues & Todo
 
 - node.js command-line arguments?
-- Frontend mobile layout
+- Frontend:
+  - Mobile layout
+  - Materia circles assets
