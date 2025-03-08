@@ -9,12 +9,18 @@ export class GearTableContainer {
     this.dataManager = dataManager;
     this.gearset = gearset;
 
+    var div = document.getElementById("gear-group-weapon");
+    this.#addTable("weapon", div);
+    if (this.gearset.job === "PLD") {
+      this.#addTable("offhand", div);
+    }
+
     var div = document.getElementById("gear-pair-left");
-    for (const id of ["weapon", "head", "body", "hands", "legs", "feet"]) {
+    for (const id of ["head", "body", "hands", "legs", "feet"]) {
       this.#addTable(id, div);
     }
     div = document.getElementById("gear-pair-right");
-    for (const id of ["offhand", "ears", "neck", "wrists", "leftring", "rightring"]) {
+    for (const id of ["ears", "neck", "wrists", "leftring", "rightring"]) {
       this.#addTable(id, div);
     }
 
