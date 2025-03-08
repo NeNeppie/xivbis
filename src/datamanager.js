@@ -1,6 +1,6 @@
 import { GearItem } from "./gearset.js";
 
-const XIVAPI_URL = "https://beta.xivapi.com/api/1/";
+const XIVAPI_URL = "https://v2.xivapi.com/api/";
 const RESULTS_PER_PAGE = 250;
 
 export default class DataManager {
