@@ -21,26 +21,56 @@ export const GearpieceStatDistribution = {
 
 // prettier-ignore
 const paramToStatKey = {
-  "Strength": "strength",
-  "Dexterity": "dexterity",
-  "Intelligence": "intelligence",
-  "Mind": "mind",
-  "Vitality": "vitality",
-  "Determination": "determination",
-  "Tenacity": "tenacity",
-  "Critical Hit": "crit",
-  "Direct Hit Rate": "directHit",
-  "Physical Damage": "wdPhys",
-  "Magic Damage": "wdMag",
-  "Attack Delay": "delay",
-  // Block Rate
-  // Block Strength
-  // Defense -> defPhys
-  // Magic Defense -> defMag
-  "Skill Speed": "spdSkill",
-  "Spell Speed": "spdSpell",
-  "Piety": "piety",
+  "Vitality":         "vitality",
+  "Strength":         "strength",
+  "Dexterity":        "dexterity",
+  "Intelligence":     "intelligence",
+  "Mind":             "mind",
+  "Determination":    "determination",
+  "Tenacity":         "tenacity",
+  "Piety":            "piety",
+  "Critical Hit":     "crit",
+  "Direct Hit Rate":  "directHit",
+  "Skill Speed":      "spdSkill",
+  "Spell Speed":      "spdSpell",
+  "Physical Damage":  "wdPhys",
+  "Magic Damage":     "wdMag",
+  "Attack Delay":     "delay",
+  "Defense":          "defPhys",
+  "Magic Defense":    "defMag",
+  // "Block Rate"
+  // "Block Strength"
 };
+
+// prettier-ignore
+export const paramToAbbr = {
+  "Vitality":         "VIT",
+  "Strength":         "STR",
+  "Dexterity":        "DEX",
+  "Intelligence":     "INT",
+  "Mind":             "MND",
+  "Determination":    "DET", 
+  "Tenacity":         "TNC",
+  "Piety":            "PIE",
+  "Critical Hit":     "CRT",
+  "Direct Hit Rate":  "DH",
+  "Skill Speed":      "SKS",
+  "Spell Speed":      "SPS",
+  "Physical Damage":  "WD",
+  "Magic Damage":     "WD",
+  "Defense":          "DEF",
+  "Magic Defense":    "DEF",
+}
+
+export function convertParamToAbbr(obj) {
+  let translated = {};
+
+  for (const [key, value] of Object.entries(obj)) {
+    // Keep the higher value, in case of stats which share an abbreviation
+    translated[paramToAbbr[key]] = translated[paramToAbbr[key]] > value ? translated[paramToAbbr[key]] : value;
+  }
+  return translated;
+}
 
 export function convertStatKeys(stats, statsHQ) {
   let translated = {};

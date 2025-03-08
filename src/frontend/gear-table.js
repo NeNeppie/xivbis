@@ -1,4 +1,6 @@
-import { createElementEx } from "./ui-core.js";
+import { jobs } from "../constants/jobstats.js";
+import { convertParamToAbbr, paramToAbbr } from "../gearset.js";
+import { sumObjectsByKey } from "../utils/math-utils.js";
 
 export class GearTableContainer {
   gearTables = [];
@@ -20,7 +22,7 @@ export class GearTableContainer {
   }
 
   #addTable(id, div) {
-    let table = new GearTable();
+    let table = new GearTable(this.gearset.job);
     table.id = id;
     this.gearTables.push(table);
     div.appendChild(table);
@@ -41,41 +43,113 @@ export class GearTableContainer {
   }
 }
 
-function createHeaderCell(text, attr) {
-  const th = createElementEx("th", { ...attr, scope: "col" });
-  th.appendChild(document.createTextNode(text));
-  return th;
-}
+const statList = [
+  "Strength",
+  "Dexterity",
+  "Intelligence",
+  "Mind",
+  "Determination",
+  "Tenacity",
+  "Piety",
+  "Critical Hit",
+  "Direct Hit Rate",
+  "Skill Speed",
+  "Spell Speed",
+];
 
 class GearTable extends HTMLTableElement {
-  constructor() {
+  #headers = [];
+
+  constructor(job) {
     super();
 
+    this.job = jobs[job];
     this.classList.add("tb", "gear-selects");
 
-    const headerRow = this.insertRow(0);
-    headerRow.appendChild(createHeaderCell("ilvl", { style: "width: 32px;" }));
-    headerRow.appendChild(createHeaderCell("", { style: "width: 32px;" }));
-    headerRow.appendChild(createHeaderCell("Name"));
-    headerRow.appendChild(createHeaderCell("Materia", { style: "width: 48px;" }));
+    this.#headers = [
+      {
+        name: "ilvl",
+        callback: (data) => {
+          return data.itemLevel;
+        },
+        colWidth: 32,
+      },
+      {
+        name: "",
+        callback: (data) => {
+          return `<img src=https://v2.xivapi.com/api/asset/${data.iconPath}?format=png>`;
+        },
+        colWidth: 32,
+      },
+      {
+        name: "Name",
+        callback: (data) => {
+          return data.name;
+        },
+        colClasses: ["overflow"],
+      },
+      {
+        name: "Materia",
+        callback: (data) => {
+          return data.materiaSlots + (data.canBePentamelded ? " (5)" : "");
+        },
+        colWidth: 56,
+      },
+      {
+        name: "WD",
+        callback: (data) => {
+          const stats = sumObjectsByKey(data.stats, data.statsHQ);
+          return Math.max(convertParamToAbbr(stats).WD);
+        },
+        condition: () => this.id === "weapon",
+        colWidth: 32,
+        colClasses: ["stat-cell"], // TEMP: Rename?
+        headerClasses: ["stat-header"],
+      },
+    ];
+
+    for (const stat of statList) {
+      this.#headers.push({
+        name: paramToAbbr[stat],
+        callback: (data) => {
+          const stats = sumObjectsByKey(data.stats, data.statsHQ);
+          return stats[stat] ?? 0;
+        },
+        condition: () => !this.job.statBlacklist.includes(stat),
+        colWidth: 32,
+        colClasses: ["stat-cell"], // TEMP: Rename?
+        headerClasses: ["stat-header"],
+      });
+    }
   }
 
   connectedCallback() {
     this.createCaption().textContent = this.id + " selection:";
+
+    const headerRow = this.insertRow(0);
+    for (const headerInfo of this.#headers) {
+      const header = new ExtendedHeader(headerInfo);
+      if (header.condition()) {
+        headerRow.appendChild(header);
+      }
+    }
   }
 
   addRow(item, gearset) {
-    const row = new GearTableRow(item, gearset);
+    const visibleHeaders = this.rows[0].cells;
+
+    const row = new GearTableRow(item, gearset, visibleHeaders);
     this.tBodies[0].appendChild(row);
   }
 }
 
 class GearTableRow extends HTMLTableRowElement {
-  constructor(item = null, gearsetInstance) {
+  constructor(item = null, gearsetInstance, headers) {
     super();
 
     this.item = item;
     this.gearset = gearsetInstance;
+    this.headers = headers;
 
     this.addEventListener("click", (e) => {
       const row = e.target.closest("tr");
@@ -94,17 +168,11 @@ class GearTableRow extends HTMLTableRowElement {
   connectedCallback() {
     this.id = this.item.id;
 
-    this.insertCell().textContent = this.item.itemLevel;
-    this.insertCell().append(
-      createElementEx("img", {
-        src: `https://beta.xivapi.com/api/1/asset/${this.item.iconPath}?format=png`,
-      })
-    );
-    const nameCell = this.insertCell();
-    this.insertCell().textContent = this.item.materiaSlots + (this.item.canBePentamelded ? " (5)" : "");
-
-    nameCell.textContent = this.item.name;
-    nameCell.classList.add("overflow");
+    for (const header of this.headers) {
+      let cell = this.insertCell();
+      cell.innerHTML = header.callback(this.item);
+      cell.classList.add(...header.colClasses);
+    }
   }
 
   #updateGearset(event) {
@@ -116,8 +184,37 @@ class GearTableRow extends HTMLTableRowElement {
   }
 }
 
+class ExtendedHeader extends HTMLTableCellElement {
+  callback = () => {};
+  condition = () => true;
+  headerClasses = [];
+  colClasses = [];
+  name = "";
+  colWidth = 0;
+
+  constructor(obj) {
+    super();
+    super.scope = "col";
+
+    for (const key of Object.keys(obj)) {
+      if (key in this) {
+        this[key] = obj[key];
+      }
+    }
+  }
+
+  connectedCallback() {
+    super.textContent = this.name;
+    if (this.colWidth) {
+      this.style.width = `${this.colWidth}px`;
+    }
+    super.classList.add(...this.headerClasses);
+  }
+}
+
 if (!customElements.get("gear-row")) customElements.define("gear-row", GearTableRow, { extends: "tr" });
 if (!customElements.get("gear-table")) customElements.define("gear-table", GearTable, { extends: "table" });
+if (!customElements.get("th-extended")) customElements.define("th-extended", ExtendedHeader, { extends: "th" });
 
 // const testRow = new GearTableRow({
 //   id: 99999,
