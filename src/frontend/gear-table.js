@@ -1,6 +1,7 @@
 import { jobs } from "../constants/jobstats.js";
 import { convertParamToAbbr, paramToAbbr } from "../gearset.js";
 import { sumObjectsByKey } from "../utils/math-utils.js";
+import { createElementEx } from "./ui-core.js";
 
 export class GearTableContainer {
   gearTables = [];
@@ -99,7 +100,7 @@ class GearTable extends HTMLTableElement {
         callback: (data) => {
           return data.materiaSlots + (data.canBePentamelded ? " (5)" : "");
         },
-        colWidth: 56,
+        colWidth: 60,
       },
       {
         name: "WD",
@@ -108,7 +109,7 @@ class GearTable extends HTMLTableElement {
           return Math.max(convertParamToAbbr(stats).WD);
         },
         condition: () => this.id === "weapon",
-        colWidth: 32,
+        colWidth: 40,
         colClasses: ["stat-cell"], // TEMP: Rename?
         headerClasses: ["stat-header"],
       },
@@ -122,7 +123,7 @@ class GearTable extends HTMLTableElement {
           return stats[stat] ?? 0;
         },
         condition: () => !this.job.statBlacklist.includes(stat),
-        colWidth: 32,
+        colWidth: 40,
         colClasses: ["stat-cell"], // TEMP: Rename?
         headerClasses: ["stat-header"],
       });
@@ -130,19 +131,34 @@ class GearTable extends HTMLTableElement {
   }
 
   connectedCallback() {
-    this.createCaption().textContent = this.id + " selection:";
+    const colgroup = createElementEx("colgroup");
+    const titleCell = createElementEx("th", { colSpan: 999, style: "text-align: center;" });
+    // FIXME: Formatting for leftring & rightring
+    titleCell.textContent = "~-~ " + this.id.toUpperCase() + " ~-~";
 
-    const headerRow = this.insertRow(0);
+    this.insertRow(0).appendChild(titleCell);
+    const headerRow = this.insertRow(1);
+
     for (const headerInfo of this.#headers) {
       const header = new ExtendedHeader(headerInfo);
       if (header.condition()) {
+        let col = createElementEx("col");
+        if (header.colWidth) {
+          col.style = `width: ${header.colWidth}px; min-width: ${header.colWidth}px;`;
+        } else {
+          col.style = "width: 100%;";
+        }
+        colgroup.append(col);
+
         headerRow.appendChild(header);
       }
     }
+
+    this.prepend(colgroup);
   }
 
   addRow(item, gearset) {
-    const visibleHeaders = this.rows[0].cells;
+    const visibleHeaders = this.rows[1].cells;
 
     const row = new GearTableRow(item, gearset, visibleHeaders);
     this.tBodies[0].appendChild(row);
@@ -211,9 +227,6 @@ class ExtendedHeader extends HTMLTableCellElement {
 
   connectedCallback() {
     super.textContent = this.name;
-    if (this.colWidth) {
-      this.style.width = `${this.colWidth}px`;
-    }
     super.classList.add(...this.headerClasses);
   }
 }
