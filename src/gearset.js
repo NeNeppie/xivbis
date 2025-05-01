@@ -1,3 +1,4 @@
+import { jobs } from "./constants/job-consts.js";
 import { calculateBaseDamage, getBaseStats } from "./math-ffxiv.js";
 import { sumObjectsByKey } from "./utils/math-utils.js";
 
@@ -20,54 +21,35 @@ export const GearpieceStatDistribution = {
 };
 
 // prettier-ignore
-const paramToStatKey = {
-  "Vitality":         "vitality",
-  "Strength":         "strength",
-  "Dexterity":        "dexterity",
-  "Intelligence":     "intelligence",
-  "Mind":             "mind",
-  "Determination":    "determination",
-  "Tenacity":         "tenacity",
-  "Piety":            "piety",
-  "Critical Hit":     "crit",
-  "Direct Hit Rate":  "directHit",
-  "Skill Speed":      "spdSkill",
-  "Spell Speed":      "spdSpell",
-  "Physical Damage":  "wdPhys",
-  "Magic Damage":     "wdMag",
-  "Attack Delay":     "delay",
-  "Defense":          "defPhys",
-  "Magic Defense":    "defMag",
-  // "Block Rate"
-  // "Block Strength"
+const paramConvertMap = {
+  "Vitality":         {code: "VIT", key: "vitality"},
+  "Strength":         {code: "STR", key: "strength"},
+  "Dexterity":        {code: "DEX", key: "dexterity"},
+  "Intelligence":     {code: "INT", key: "intelligence"},
+  "Mind":             {code: "MND", key: "mind"},
+  "Determination":    {code: "DET", key: "determination"},
+  "Tenacity":         {code: "TNC", key: "tenacity"},
+  "Piety":            {code: "PIE", key: "piety"},
+  "Critical Hit":     {code: "CRT", key: "crit"},
+  "Direct Hit Rate":  {code: "DH",  key: "directHit"},
+  "Skill Speed":      {code: "SKS", key: "spdSkill"},
+  "Spell Speed":      {code: "SPS", key: "spdSpell"},
+  "Physical Damage":  {code: "WD",  key: "wdPhys"},
+  "Magic Damage":     {code: "WD",  key: "wdMag"},
+  "Attack Delay":     {code: "AA",  key: "delay"},
+  "Defense":          {code: "DEF", key: "defPhys"},
+  "Magic Defense":    {code: "DEF", key: "defMag"},
+  // "Block Rate",
+  // "Block Strength",
 };
-
-// prettier-ignore
-export const paramToAbbr = {
-  "Vitality":         "VIT",
-  "Strength":         "STR",
-  "Dexterity":        "DEX",
-  "Intelligence":     "INT",
-  "Mind":             "MND",
-  "Determination":    "DET", 
-  "Tenacity":         "TNC",
-  "Piety":            "PIE",
-  "Critical Hit":     "CRT",
-  "Direct Hit Rate":  "DH",
-  "Skill Speed":      "SKS",
-  "Spell Speed":      "SPS",
-  "Physical Damage":  "WD",
-  "Magic Damage":     "WD",
-  "Defense":          "DEF",
-  "Magic Defense":    "DEF",
-}
 
 export function convertParamToAbbr(obj) {
   let translated = {};
 
   for (const [key, value] of Object.entries(obj)) {
     // Keep the higher value, in case of stats which share an abbreviation
-    translated[paramToAbbr[key]] = translated[paramToAbbr[key]] > value ? translated[paramToAbbr[key]] : value;
+    translated[paramConvertMap[key].code] =
+      translated[paramConvertMap[key].code] > value ? translated[paramConvertMap[key].code] : value;
   }
   return translated;
 }
@@ -75,25 +57,26 @@ export function convertParamToAbbr(obj) {
 export function convertStatKeys(stats, statsHQ) {
   let translated = {};
 
-  for (const [key, value] of Object.entries(paramToStatKey)) {
-    translated[value] = stats[key] ?? 0;
+  for (const [key, value] of Object.entries(paramConvertMap)) {
+    translated[value.key] = stats[key] ?? 0;
   }
 
   // Passing HQ stats treats the item as its HQ variant.
   if (statsHQ !== undefined) {
     for (const [key, value] of Object.entries(statsHQ)) {
-      translated[paramToStatKey[key]] += value;
+      translated[paramConvertMap[key].key] += value;
     }
   }
   return translated;
 }
 
 export class Gearset {
-  /** @param {number} level @param {string} job */
-  constructor(level, job) {
+  /** @param {number} level @param {string} jobCode */
+  constructor(level, jobCode) {
     this.slots = {}; // a really odd solution for infinite recursion
     this.level = level;
-    this.job = job;
+    this.jobCode = jobCode;
+    this.job = jobs[jobCode];
 
     ["weapon", "offhand", "head", "body", "hands", "legs", "feet", "ears", "neck", "wrists", "leftring", "rightring"].forEach(
       (property) => {
@@ -103,7 +86,7 @@ export class Gearset {
           },
           set: function (value) {
             this.slots[property] = value;
-            this.calculateDamage();
+            this.renderExampleDamage();
           },
         });
       }
@@ -122,10 +105,10 @@ export class Gearset {
       }
       stats = sumObjectsByKey(stats, item.stats, item.statsHQ);
     }
-    return sumObjectsByKey(stats, getBaseStats(this.level, this.job, this.tribe ?? "default"));
+    return sumObjectsByKey(stats, getBaseStats(this.level, this.jobCode, this.tribe ?? "default"));
   }
 
-  calculateDamage() {
+  renderExampleDamage() {
     const elemStats = document.getElementById("item-stats");
     const elemDamage = document.getElementById("item-dmg");
     const configLevel = document.getElementById("config-level").value;

@@ -1,4 +1,4 @@
-import { jobs } from "./constants/jobstats.js";
+import { jobs } from "./constants/job-consts.js";
 import { jobModifiers, levelModifiers, tribalStats } from "./constants/modifiers.js";
 import { cel, flr, sumObjectsByKey } from "./utils/math-utils.js";
 
