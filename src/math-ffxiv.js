@@ -108,25 +108,27 @@ function getGlobalCoolDown(lv, statSpeed, baseGCD) {
   return flr((baseGCD * (1000 + speed)) / 1000);
 }
 
-/** Basic function for damage calculation. */
-export function calculateBaseDamage(lv, job, stats, potency = 100, isAuto = false, isDot = false, autoDH = false) {
+/**
+ * Basic function for base damage calculation. Does not factor in Critical Hit and Direct Hit.
+ */
+export function calculateBaseDamage(level, job, stats, potency, isAuto = false, isDot = false, buffDmg = 0) {
   const attribute = isAuto ? stats[jobs[job].autoStat] : stats[jobs[job].mainStat];
   const speedStat = isAuto /* || attackType === Weaponskill */ ? stats.spdSkill : stats.spdSpell;
 
-  const multiplierSPD = isAuto || isDot ? getSpeedMultiplier(lv, job, speedStat) : 1.0;
-  const multiplierAP = getAttackPower(lv, job, attribute);
-  const multiplierDET = getDeterminationMultiplier(lv, stats.determination);
-  const multiplierTNC = getTenacityMultiplier(lv, job, stats.tenacity);
-  // TODO: Distinguish between Physical (Weaponskill) & Magical (Spell). Abilities?
+  const multiplierSPD = isAuto || isDot ? getSpeedMultiplier(level, speedStat) : 1.0;
+  const multiplierAP = getAttackPower(level, job, attribute);
+  const multiplierDET = getDeterminationMultiplier(level, stats.determination);
+  const multiplierTNC = getTenacityMultiplier(level, job, stats.tenacity);
+  // TODO: Distinguish between Physical (Weaponskill) & Magical (Spell). Magic uses a slightly different formula
+  //       Calculations while under the effect of a Crit Direct Hit Guarantee buff.
   const multiplierWD = isAuto
-    ? getAutoAttackModifier(lv, job, stats.wdPhys, stats.delay)
-    : getWeaponDamageMultiplier(lv, job, stats.wdPhys);
+    ? getAutoAttackModifier(level, job, stats.wdPhys, stats.delay)
+    : getWeaponDamageMultiplier(level, job, stats.wdPhys);
 
-  potency = isAuto ? jobs[job].autoPotency : potency;
   let damage = flr((potency / 100) * multiplierWD * flr(multiplierAP * multiplierDET, 2)) * multiplierTNC * multiplierSPD;
-  console.log(
-    `DMG = (${potency}p * ${multiplierWD}wd * (${multiplierAP}ap * ${multiplierDET}det)) * ${multiplierTNC}tnc (* ${multiplierSPD}spd)`
-  );
+  // console.log(
+  //   `DMG = (${potency}p * ${multiplierWD}wd * (${multiplierAP}ap * ${multiplierDET}det)) * ${multiplierTNC}tnc (* ${multiplierSPD}spd)`
+  // );
 
   const trait = jobs[job].traitBonus;
   if (typeof trait !== "undefined") {
@@ -138,25 +140,31 @@ export function calculateBaseDamage(lv, job, stats, potency = 100, isAuto = fals
 
   // TODO: Research standard deviation / uniform distribution
   //return D2 * (getRandomInt(95, 105) / 100) /* * getBuffs() calculate afterwards */;
-  damage = applyCritDh(lv, damage, stats);
+  damage += damage * buffDmg;
   return flr(damage, 2);
 }
 
 /**
- * Calculates the average damage of an action after taking critical hits and direct hits into account.
- * @param {number} lv Supported character level
- * @param {number} baseDamage Action damage before RNG
- * @param {*} stats Character stats structure. Used: `crit` and `directHit`
- * @returns Average action damage w/ critical and direct hits, floored down to the hundredth
+ * Applies Crit and Direct Hit stats unto base damage. Result is floored down to the hundredth.
  */
-export function applyCritDh(lv, baseDamage, stats) {
-  const multiplierCrit = getCritMultiplier(lv, stats.crit);
-  const probabilityCrit = getCritHitRate(lv, stats.crit) / 100;
-  const probabilityDirect = getDirectHitRate(lv, stats.directHit) / 100;
+export function applyCritDh(level, baseDamage, stats, buffCrit = 0, buffDirect = 0) {
+  const multiplierCrit = getCritMultiplier(level, stats.crit);
+  const probabilityCrit = getCritHitRate(level, stats.crit) / 100;
+  const probabilityDirect = getDirectHitRate(level, stats.directHit) / 100;
 
-  console.log(`critRate: ${probabilityCrit}, directRate: ${probabilityDirect}, critMult: ${multiplierCrit}`);
+  //console.log(`critRate: ${probabilityCrit}, directRate: ${probabilityDirect}, critMult: ${multiplierCrit}`);
 
-  const directHit = 1 + probabilityDirect * 0.25;
-  const criticalHit = 1 + probabilityCrit * (multiplierCrit - 1);
+  const directHit = 1 + (probabilityDirect + buffDirect) * 0.25;
+  const criticalHit = 1 + (probabilityCrit + buffCrit) * (multiplierCrit - 1);
   return flr(baseDamage * directHit * criticalHit, 2);
+}
+
+/**
+ * Performs action damage calculation. Returns computed damage with and without Crit/Direct Hit applied
+ */
+export function calculateDamage(level, job, stats, potency, isAuto = false, isDot = false, buffs = {}) {
+  const dmgBase = calculateBaseDamage(level, job, stats, potency, isAuto, isDot, buffs.damage);
+  const dmgExpected = applyCritDh(level, dmgBase, stats, buffs.crit, buffs.direct);
+
+  return { base: dmgBase, expected: dmgExpected };
 }

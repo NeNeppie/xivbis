@@ -122,7 +122,7 @@ export class Gearset {
     if (configLevel !== this.level) {
       this.level = configLevel;
     }
-    elemDamage.innerHTML = `${calculateBaseDamage(this.level, this.job, convertStatKeys(stats))}`;
+    elemDamage.innerHTML = `${calculateBaseDamage(this.level, this.jobCode, convertStatKeys(stats), 100)}`;
   }
 }
 
