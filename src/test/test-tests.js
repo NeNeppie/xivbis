@@ -15,8 +15,8 @@ describe("Unit Testing the Unit Tester", () => {
     assert.equals(true, 1);
   });
 
-  it("Shouldn't accept truthy/falsy values for DeepEquals", () => {
-    not(assert.deepEquals, null, undefined);
+  it("Shouldn't accept truthy/falsy values for strictEquals", () => {
+    not(assert.strictEquals, null, undefined);
   });
 
   // Just for fun, as an exercise
@@ -39,4 +39,32 @@ describe("Unit Testing the Unit Tester", () => {
       });
     });
   });
+
+  it("Correctly compares objects with depth", () => {
+    assert.deepEquals({ a: 1, b: { c: 3 } }, { a: 1, b: { c: 3 } });
+    not(assert.deepEquals, ({ a: 1, b: { c: 3 } }, { a: 1, b: { d: 4 } }));
+  });
+
+  it("Correctly compares a select portion of an object", () => {
+    assert.partialDeepEquals({ a: 1, c: { d: 4 } }, { a: 1, b: 2, c: { e: 5, d: 4 } });
+  });
+});
+
+configure({ logPerformance: false });
+describe("[0] Testing `describe` indentation", () => {
+  describe("[1]", () => {
+    describe("[2]", () => {
+      describe("[3]", () => {});
+    });
+
+    describe("[2] Hello", () => {});
+  });
+
+  describe("[1]", () => {
+    describe("[2]", () => {});
+  });
+});
+
+describe("[0] World", () => {
+  describe("[1]", () => {});
 });

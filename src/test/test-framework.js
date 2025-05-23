@@ -1,6 +1,7 @@
 var testConfig = {
   logPerformance: false,
   timeout: 5000,
+  describeIndent: 0,
 };
 
 export function configure(config) {
@@ -9,12 +10,14 @@ export function configure(config) {
 }
 
 export function describe(description, func) {
-  console.log(`\x1b[1;33m${description}\x1b[0m`);
-  console.log(`Profiling: \x1b[38;5;214m${testConfig.logPerformance}\x1b[0m`);
+  console.log(`${" ".repeat(testConfig.describeIndent * 2)}\x1b[1;33m${description}\x1b[0m`);
+  //console.log(`Profiling: \x1b[38;5;214m${testConfig.logPerformance}\x1b[0m`);
 
+  testConfig.describeIndent++;
   const startTime = performance.now();
   func.call(this);
   const endTime = performance.now();
+  testConfig.describeIndent--;
 
   if (testConfig?.logPerformance) {
     console.log(`Time elapsed: ${(endTime - startTime).toFixed(4)} ms`);
@@ -72,15 +75,41 @@ export const assert = {
     }
   },
 
-  equals: function (expected, value) {
-    if (expected != value) {
+  equals: function (expected, actual) {
+    if (expected != actual) {
       throw new Error();
     }
   },
 
-  deepEquals: function (expected, value) {
-    if (expected !== value) {
+  strictEquals: function (expected, actual) {
+    if (expected !== actual) {
       throw new Error();
     }
+  },
+
+  deepEquals: function (expected, actual) {
+    const jsonExpected = JSON.stringify(expected);
+    const jsonActual = JSON.stringify(actual);
+
+    if (jsonExpected !== jsonActual) {
+      throw new Error();
+    }
+  },
+
+  partialDeepEquals: function (expected, actual) {
+    const deepLoopKeys = (obj1, obj2) => {
+      let result = {};
+      for (const k in obj1) {
+        if (typeof obj1[k] === "object") {
+          result[k] = deepLoopKeys(obj1[k], obj2[k]);
+        } else if (obj2.hasOwnProperty(k)) {
+          result[k] = obj2[k];
+        }
+      }
+      return result;
+    };
+
+    const stripped = deepLoopKeys(expected, actual);
+    this.deepEquals(expected, stripped);
   },
 };
