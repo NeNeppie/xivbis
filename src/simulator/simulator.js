@@ -6,7 +6,7 @@ import { TrackerArray, TrackerBase } from "./tracker-utils.js";
 
 const DOT_TICKRATE = 3;
 
-class TimeTrackerSimulation {
+export class TimeTrackerSimulation {
   /** Tracker type made for registering Auto Attack events */
   static TrackerAutos = class TrackerAutos extends TrackerBase {
     #context;
@@ -40,7 +40,7 @@ class TimeTrackerSimulation {
 
       const damage = calculateDamage(level, jobCode, stats, this.potency, true, false, buffs);
       this.timer = stats.delay;
-      this.#context.sendEventDamage(this.eventType, this.eventName, this.potency, damage);
+      this.#context.sendEventDamage(this.eventType, this.eventName, damage, { potency: this.potency });
     }
 
     #getUnlimitedBuffsByType(type) {
@@ -58,21 +58,19 @@ class TimeTrackerSimulation {
    *  Also acts as a builder for 'lesser' Trackers that tie to specific actions */
   static TrackerGlobalCooldown = class TrackerGlobalCooldown extends TrackerBase {
     #context;
-    #predefinedGCDList = [];
+    #prevComboSuccess = false;
 
     eventType = "Global Cooldown";
     gcdStepper = {
       iterator: undefined,
       current: null,
       prev: null,
-      prevSuccess: false,
       done: false,
 
-      advance(success) {
+      advance() {
         const iterStep = this.iterator.next();
         this.prev = this.current;
         this.current = iterStep.value;
-        this.prevSuccess = success;
         this.done = iterStep.done;
       },
     };
@@ -84,7 +82,6 @@ class TimeTrackerSimulation {
 
     /** @param {array} value*/
     set predefinedGCDList(value) {
-      this.#predefinedGCDList = value;
       this.gcdStepper.iterator = value[Symbol.iterator]();
       this.gcdStepper.advance();
     }
@@ -93,21 +90,19 @@ class TimeTrackerSimulation {
       super.generateEvent();
       const currAction = this.gcdStepper.current;
       const prevAction = this.gcdStepper.prev;
+      this.eventName = currAction.name;
 
       const conditionRes = currAction.condition?.call(this);
       if (conditionRes === false) {
         this.#context.sendEventError(this.eventType, this.eventName, `Action nonexecutable due to missing condition.`);
-        this.gcdStepper.advance(false);
+        this.gcdStepper.advance();
         return;
       }
 
-      // FIXME: starting a combo from the middle will count future actions as combo'd correctly which is obviously unintended.
-      const isCombo = currAction.checkCombo?.(prevAction?.name) && this.gcdStepper.prevSuccess;
+      const isCombo = currAction.checkCombo?.(prevAction?.name, this.#prevComboSuccess) ?? true;
+      this.#prevComboSuccess = isCombo;
 
-      let potency = currAction.potency;
-      if (isCombo) {
-        potency = currAction.comboPotency;
-      }
+      let potency = isCombo ? currAction?.comboPotency ?? currAction.potency : currAction.potency;
 
       this.#handleActionStatuses(currAction, isCombo);
 
@@ -137,22 +132,21 @@ class TimeTrackerSimulation {
       if (conditionRes) usedStatusEffects.push(conditionRes);
       this.#consumeStatusEffects(usedStatusEffects);
 
-      this.eventName = currAction.name;
       this.timer = currAction.baseRecastTime;
-
       this.gcdStepper.advance(true);
 
       let eventData = {
         combo: isCombo,
+        potency: potency,
       };
-      this.#context.sendEventDamage(this.eventType, this.eventName, potency, damage);
+      this.#context.sendEventDamage(this.eventType, this.eventName, damage, eventData);
     }
 
     #handleActionDoTs(action, isComboSuccess, buffs) {
       action.dots?.forEach((dot) => {
         if ((dot.onSuccessfulCombo && isComboSuccess) || !dot.onSuccessfulCombo) {
           // Create / Refresh dot tracker.
-          let dotTracker = this.#context.trackers.getTrackerByName(dot.name);
+          let dotTracker = this.#context.trackers.getTracker("Damage over Time", dot.name);
           if (dotTracker) {
             dotTracker.refresh(dot.potency, dot.duration, buffs);
           } else {
@@ -167,7 +161,7 @@ class TimeTrackerSimulation {
       action.statuses?.forEach((status) => {
         if ((status.onSuccessfulCombo && isComboSuccess) || !status.onSuccessfulCombo) {
           // Create / Refresh status tracker.
-          let statusTracker = this.#context.trackers.getTrackerByName(status.name);
+          let statusTracker = this.#context.trackers.getTracker("Status Effect", status.name);
           if (statusTracker) {
             statusTracker.refresh(status.duration);
           } else {
@@ -178,8 +172,9 @@ class TimeTrackerSimulation {
       });
     }
 
+    // NOTE: Used in action-builder's Conditions.
     getStatusEffect(name) {
-      return this.#context.trackers.getActiveTrackersByType("Status Effect").getTrackerByName(name);
+      return this.#context.trackers.getActiveTracker("Status Effect", name);
     }
 
     #getBuffsByType(type) {
@@ -200,15 +195,9 @@ class TimeTrackerSimulation {
         }
         if (effect.uses === 0) {
           status.active = false;
+          // TODO: Expiration event
         }
       }
-
-      // Unsure now why I decided to split this function into 2. There was probably a good reason that I'll rediscover later on.
-      // for (const tracker of this.#context.trackers.getTrackersByType("Status Effect")) {
-      //   if (tracker.effect.uses === 0) {
-      //     tracker.active = false;
-      //   }
-      // }
     }
   };
 
@@ -233,7 +222,7 @@ class TimeTrackerSimulation {
 
       const damage = calculateDamage(level, jobAbbr, stats, this.potency, false, true, this.snapshottedEffects);
       this.timer = DOT_TICKRATE;
-      this.#context.sendEventDamage(this.eventType, this.eventName, this.potency, damage);
+      this.#context.sendEventDamage(this.eventType, this.eventName, damage, { potency: this.potency });
     }
 
     refresh(potency, newDuration, snapshottedEffects, isNew = false) {
@@ -279,15 +268,16 @@ class TimeTrackerSimulation {
     }
   };
 
-  events = [];
-  elapsed = 0;
-
   constructor(gearset) {
     this.gearset = gearset;
+    this.reset();
+  }
 
+  reset() {
+    this.events = [];
+    this.elapsed = 0;
     this.trackers = new TrackerArray();
     this.trackers.append(new TimeTrackerSimulation.TrackerGlobalCooldown(this));
-    this.trackers.append(new TimeTrackerSimulation.TrackerAutos(this, this.gearset.job.autoPotency));
   }
 
   /** Base layer of an event object */
@@ -299,11 +289,11 @@ class TimeTrackerSimulation {
   };
 
   /** Appends a regular damage event */
-  sendEventDamage(type, name, potency, damageObj) {
+  sendEventDamage(type, name, damage, data) {
     const event = {
       ...new this.EventObjectBase(this.elapsed, type, name, "Damage"),
-      potency: potency,
-      damage: damageObj,
+      damage: damage,
+      data: data,
     };
     this.events.push(event);
   }
@@ -337,9 +327,20 @@ class TimeTrackerSimulation {
     });
   }
 
-  simCombatLoop(stats, predefinedActions, duration = 60, startingPoint = 0, endSimWhenPredefActionsEnd = false) {
+  simCombatLoop(
+    stats,
+    predefinedActions,
+    duration = 60,
+    startingPoint = 0,
+    endSimWhenPredefActionsEnd = false,
+    simulateAutos = true
+  ) {
     this.elapsed = startingPoint;
+
     const trackerGCD = this.trackers[0];
+    if (simulateAutos) {
+      this.trackers.append(new TimeTrackerSimulation.TrackerAutos(this, this.gearset.job.autoPotency));
+    }
 
     const gcds = this.extractGCDsFromActionList(predefinedActions);
     trackerGCD.predefinedGCDList = gcds;
@@ -383,14 +384,11 @@ class TimeTrackerSimulation {
     if (this.elapsed > duration) {
       this.elapsed = duration;
     }
-
-    console.log("### Simulation Complete ###");
-    this.printSimulationInformation();
   }
 
   getEventTotalDamageByType(type) {
     const damageInstances = this.events.flatMap((event) => {
-      if (event.type === type && event.damage) return [event.damage];
+      if (event.type === type && event.category === "Damage") return [event.damage];
       else return [];
     });
     try {
@@ -405,8 +403,12 @@ class TimeTrackerSimulation {
     }
   }
 
-  printSimulationInformation() {
+  printEvents() {
     console.table(this.events);
+  }
+
+  printSimulationInformation() {
+    this.printEvents();
 
     // Great Googly Moogly
     console.log(`Time Elapsed: ${this.elapsed} Seconds. \nTracker Information:`);
@@ -430,25 +432,3 @@ class TimeTrackerSimulation {
     console.log(`Base DPS: ${dps.base}, Expected DPS: ${dps.expected}`);
   }
 }
-
-const debugGearset = new Gearset(100, "DRG");
-debugGearset.debugStats = {
-  wdPhys: 144,
-  delay: 2.8,
-  strength: 440 * 1.15 + 595,
-  determination: 440 + 384,
-  crit: 420 + 269,
-  directHit: 420 + 0,
-  spdSkill: 420 + 0,
-  spdSpell: 420 + 0,
-  // auto?: 134.39
-};
-
-/*
-As a proof of concept I'll use:
-`Dragoon` for all abilities, and
-`Spear Eternal` for the weapon .
-*/
-
-const simulator = new TimeTrackerSimulation(debugGearset);
-simulator.simCombatLoop(simulator.gearset.debugStats, dragoonRotationBasicTest, 60);

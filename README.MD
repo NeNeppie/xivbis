@@ -3,7 +3,7 @@
 THIS IS BIS BRUTE FORCING BITCH!!!
 
 We clown in this muthafucka betta
-take yo sensitive ass back to xivgear
+take yo sensitive ass back to The Balance
 
 ## Installation
 
@@ -17,8 +17,8 @@ The foundation. Stat & Damage calculations
 
     ✅ Support for auto attacks
     ✅ Support for DoTs (affected by speed)
-    - Support for autocrits (Reassemble, etc.)
-    - Support for party buffs (all types)
+    - Support for guaranteed crits (Reassemble, etc.)
+    ✅ Support for party buffs (all types)
     - Trait bonus for SCH and SMN pets (+30%) [3]
     - Healing and HP calculations
     🟨 Support for ALL Equipment levels
@@ -43,7 +43,19 @@ The logic stage that binds all systems together via "Gearsets"
 
 Implementing realistic damage calculation by simulating a damage rotation for a set amount of time.
 
-    - ???
+    ✅ Calculating Autos, accounting for SkS and weapon type
+    - Supporting action types:
+        ✅ GCDs
+        - oGCDs (weaving, anim locks, etc.)
+        ✅ DoTs
+        ✅ Combos
+        ✅ Status granters / inflicters
+    - Write down all actions for each job
+    - Build an actual rotation for each job
+        - ( Status table for all jobs will go here in the future )
+    - Add support for potion uses
+    - Add support for party buffs & bursts
+    - Level backwards compatiblity
 
 ### Bruteforce stage `[4]`:
 

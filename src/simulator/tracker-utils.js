@@ -39,6 +39,14 @@ export class TrackerArray extends Array {
     return super.flatMap((e) => (e.eventType === type && e.active ? [e] : []));
   }
 
+  getTracker(type, name) {
+    return super.find((e) => e.eventType === type && e.eventName === name);
+  }
+
+  getActiveTracker(type, name) {
+    return super.find((e) => e.eventType === type && e.eventName === name && e.active);
+  }
+
   getActive() {
     return super.flatMap((tracker) => {
       if (tracker.active) {
