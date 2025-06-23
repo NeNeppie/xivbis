@@ -1,5 +1,7 @@
 const DEFAULT_ANIMATION_LOCK = 0.6;
 
+// TODO: Look into decorators (apparently a thing in JS) as replacement for setXYZ functions
+
 class ActionBuilder {
   CreateBase(name, potency) {
     return {
@@ -7,18 +9,20 @@ class ActionBuilder {
       potency: potency,
 
       /**
-       * Sets the action's timers: Cast Time, Cooldown, Application and Animation.
-       * @param {object} timers
+       * Sets the action's timers.
+       * @param {object} timers Respects the following keys:
+       *  baseCastTime, baseRecastTime, cooldown, applicationTime, animationLock, charges
        */
-      // TODO: Some GCDs have a long cooldown but don't affect the recast time e.g. SMN summons
-      //       Some GCDs have longer/shorter than usual recast timers e.g. Picto
-      //       So I need a separate `cooldown` property
+      // Some GCDs have a long cooldown but don't affect the recast time e.g. SMN summons
+      // Some GCDs have longer/shorter than usual recast timers e.g. Picto
+      // So I need a separate `cooldown` property
       setTimers(timers) {
         this.baseCastTime = timers.baseCastTime ?? 0;
         this.baseRecastTime = timers.baseRecastTime ?? 0.6;
         this.cooldown = timers.cooldown ?? 0;
         this.applicationTime = timers.applicationTime ?? 0;
         this.animationLock = timers.animationLock ?? DEFAULT_ANIMATION_LOCK;
+        this.charges = timers.charges ?? 1;
         return this;
       },
 

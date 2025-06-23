@@ -36,8 +36,10 @@ export class ArrayEx extends Array {
 
 export class StandardSimulation {
   #statsOverwrite;
+  #cooldowns = new Map();
   #effects = new ArrayEx();
   #dots = [];
+  #elapsedTime = 0;
   // #actionList = [];
 
   constructor(gearset) {
@@ -47,11 +49,12 @@ export class StandardSimulation {
 
   /** Does not reset overwritten stats */
   reset() {
+    this.#cooldowns.clear();
     this.#effects = new ArrayEx();
     this.#dots = [];
+    this.#elapsedTime = 0;
     // this.#actionList = [];
 
-    this.elapsed = 0;
     this.fightDuration = 0;
     this.startingPoint = 0;
     this.lastGCD = null;
@@ -101,12 +104,55 @@ export class StandardSimulation {
     this.#statsOverwrite = newStats;
   }
 
+  get elapsed() {
+    return this.#elapsedTime;
+  }
+  set elapsed(time) {
+    const delta = time - this.#elapsedTime;
+    this.#elapsedTime = time;
+    // advance cooldowns of used abilities. we do be triple nested iffing
+    this.#cooldowns.forEach((cd) => {
+      if (cd.cooldown > 0) {
+        cd.cooldown = Math.max(cd.cooldown - delta, 0);
+        if (cd.cooldown === 0) {
+          cd.charges++;
+          if (cd.charges < cd.maxCharges) {
+            cd.cooldown = cd.maxCooldown;
+          }
+        }
+      }
+    });
+  }
+
   get remainingTime() {
     return this.fightDuration - this.elapsed;
   }
 
   isActive(obj) {
     return obj.startTime <= this.elapsed && obj.endTime >= this.elapsed;
+  }
+
+  // returns true if the action cannot be used due to cooldown
+  checkCooldown(name) {
+    const cd = this.#cooldowns.get(name);
+    if (cd) {
+      return cd.charges > 0 ? false : cd.cooldown > 0 ? true : false;
+    }
+    return false;
+  }
+  // Decrements a charge and sets cooldown accordingly
+  setOnCooldown(action) {
+    const existing = this.#cooldowns.get(action.name);
+    if (existing) {
+      this.#cooldowns.set(action.name, { ...existing, charges: existing.charges - 1 });
+    } else {
+      this.#cooldowns.set(action.name, {
+        maxCooldown: action.cooldown,
+        cooldown: action.cooldown,
+        maxCharges: action.charges,
+        charges: action.charges - 1,
+      });
+    }
   }
 
   getValidActionBuffs(action) {
@@ -128,7 +174,6 @@ export class StandardSimulation {
     return this.#effects.find((e) => e.name === name && this.isActive(e));
   }
 
-  //
   recordStatus(status, duration, stackDelta) {
     const record = {
       ...status,
@@ -232,6 +277,12 @@ export class StandardSimulation {
   }
 
   handleAction(action) {
+    const isOnCooldown = this.checkCooldown(action.name);
+    if (isOnCooldown) {
+      this.sendEventError(action.name, "Action on cooldown.");
+      return false;
+    }
+
     const conditionRes = action.condition?.call(this, this);
     if (conditionRes === false) {
       this.sendEventError(action.name, "Action condition failed.");
@@ -315,6 +366,10 @@ export class StandardSimulation {
         this.sendEventState("Damage over Time", dot.name, dotFound ? "Reapplied" : "Applied", dot);
       }
     });
+
+    if (action.cooldown) {
+      this.setOnCooldown(action);
+    }
 
     return true;
   }
