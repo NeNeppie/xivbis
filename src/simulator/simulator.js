@@ -1,307 +1,84 @@
-import { Gearset } from "../gearset.js";
 import { calculateDamage } from "../math-ffxiv.js";
-import { rnd, sumObjectsByKey } from "../utils/math-utils.js";
-import { dragoonRotationBasicTest } from "./drg-actions.js";
-import { TrackerArray, TrackerBase } from "./tracker-utils.js";
+import { rnd } from "../utils/math-utils.js";
 
 const DOT_TICKRATE = 3;
+// const TIME_ADVANCEMENT_PING_DELAY = 0.02;
 
-export class TimeTrackerSimulation {
-  /** Tracker type made for registering Auto Attack events */
-  static TrackerAutos = class TrackerAutos extends TrackerBase {
-    #context;
+export class ArrayEx extends Array {
+  /** @alias push */
+  append(value) {
+    super.push(value);
+  }
 
-    eventType = "Auto Attack";
-    eventName = this.eventType;
-
-    constructor(ctx, potency) {
-      super();
-      this.#context = ctx;
-      this.potency = potency;
+  remove(value) {
+    const index = super.indexOf(value);
+    if (index !== -1) {
+      super.splice(index, 1);
     }
+  }
 
-    generateEvent(level, jobCode, stats) {
-      super.generateEvent();
+  getByName(name) {
+    return super.find((e) => e.name === name);
+  }
 
-      const buffs = {
-        damage: Math.min(
-          1,
-          this.#getUnlimitedBuffsByType("damage")?.reduce((total, status) => total + status.effect.amount, 0)
-        ),
-        crit: Math.min(
-          1,
-          this.#getUnlimitedBuffsByType("crit").reduce((total, status) => total + status.effect.amount, 0)
-        ),
-        direct: Math.min(
-          1,
-          this.#getUnlimitedBuffsByType("directhit").reduce((total, status) => total + status.effect.amount, 0)
-        ),
-      };
+  /** Creates a deep copy. Should not affect the source array */
+  getActive(time) {
+    return super.flatMap((e) => {
+      return e.startTime <= time && e.endTime >= time ? [e] : [];
+    });
+  }
 
-      const damage = calculateDamage(level, jobCode, stats, this.potency, true, false, buffs);
-      this.timer = stats.delay;
-      this.#context.sendEventDamage(this.eventType, this.eventName, damage, { potency: this.potency });
-    }
+  /** Creates a shallow copy. Can affect the source array */
+  getActiveShallow(time) {
+    return super.filter((e) => e.startTime <= time && e.endTime >= time);
+  }
+}
 
-    #getUnlimitedBuffsByType(type) {
-      return this.#context.trackers.getActiveTrackersByType("Status Effect")?.flatMap((e) => {
-        if (e.effect.type === type && e.effect.uses === -1) {
-          return [e];
-        } else {
-          return [];
-        }
-      });
-    }
-  };
-
-  /** Tracker type made for registering GCD events.
-   *  Also acts as a builder for 'lesser' Trackers that tie to specific actions */
-  static TrackerGlobalCooldown = class TrackerGlobalCooldown extends TrackerBase {
-    #context;
-    #prevComboSuccess = false;
-
-    eventType = "Global Cooldown";
-    gcdStepper = {
-      iterator: undefined,
-      current: null,
-      prev: null,
-      done: false,
-
-      advance() {
-        const iterStep = this.iterator.next();
-        this.prev = this.current;
-        this.current = iterStep.value;
-        this.done = iterStep.done;
-      },
-    };
-
-    constructor(ctx) {
-      super();
-      this.#context = ctx;
-    }
-
-    /** @param {array} value*/
-    set predefinedGCDList(value) {
-      this.gcdStepper.iterator = value[Symbol.iterator]();
-      this.gcdStepper.advance();
-    }
-
-    generateEvent(level, jobCode, stats) {
-      super.generateEvent();
-      const currAction = this.gcdStepper.current;
-      const prevAction = this.gcdStepper.prev;
-      this.eventName = currAction.name;
-
-      const conditionRes = currAction.condition?.call(this);
-      if (conditionRes === false) {
-        this.#context.sendEventError(this.eventType, this.eventName, `Action nonexecutable due to missing condition.`);
-        this.gcdStepper.advance();
-        return;
-      }
-
-      const isCombo = currAction.checkCombo?.(prevAction?.name, this.#prevComboSuccess) ?? true;
-      this.#prevComboSuccess = isCombo;
-
-      let potency = isCombo ? currAction?.comboPotency ?? currAction.potency : currAction.potency;
-
-      this.#handleActionStatuses(currAction, isCombo);
-
-      const damageStatusEffects = this.#getBuffsByType("damage");
-      const critRateStatusEffects = this.#getBuffsByType("crit");
-      const directHitRateStatusEffects = this.#getBuffsByType("directhit");
-
-      const buffs = {
-        damage: Math.min(
-          1,
-          damageStatusEffects?.reduce((total, status) => total + status.effect.amount, 0)
-        ),
-        crit: Math.min(
-          1,
-          critRateStatusEffects?.reduce((total, status) => total + status.effect.amount, 0)
-        ),
-        direct: Math.min(
-          1,
-          directHitRateStatusEffects?.reduce((total, status) => total + status.effect.amount, 0)
-        ),
-      };
-      const damage = calculateDamage(level, jobCode, stats, potency, false, false, buffs);
-
-      this.#handleActionDoTs(currAction, isCombo, buffs);
-
-      let usedStatusEffects = [damageStatusEffects, critRateStatusEffects, directHitRateStatusEffects];
-      if (conditionRes) usedStatusEffects.push(conditionRes);
-      this.#consumeStatusEffects(usedStatusEffects);
-
-      this.timer = currAction.baseRecastTime;
-      this.gcdStepper.advance(true);
-
-      let eventData = {
-        combo: isCombo,
-        potency: potency,
-      };
-      this.#context.sendEventDamage(this.eventType, this.eventName, damage, eventData);
-    }
-
-    #handleActionDoTs(action, isComboSuccess, buffs) {
-      action.dots?.forEach((dot) => {
-        if ((dot.onSuccessfulCombo && isComboSuccess) || !dot.onSuccessfulCombo) {
-          // Create / Refresh dot tracker.
-          let dotTracker = this.#context.trackers.getTracker("Damage over Time", dot.name);
-          if (dotTracker) {
-            dotTracker.refresh(dot.potency, dot.duration, buffs);
-          } else {
-            dotTracker = new TimeTrackerSimulation.TrackerDoT(this.#context, dot.name, dot.potency, dot.duration, buffs);
-            this.#context.trackers.append(dotTracker);
-          }
-        }
-      });
-    }
-
-    #handleActionStatuses(action, isComboSuccess) {
-      action.statuses?.forEach((status) => {
-        if ((status.onSuccessfulCombo && isComboSuccess) || !status.onSuccessfulCombo) {
-          // Create / Refresh status tracker.
-          let statusTracker = this.#context.trackers.getTracker("Status Effect", status.name);
-          if (statusTracker) {
-            statusTracker.refresh(status.duration);
-          } else {
-            statusTracker = new TimeTrackerSimulation.TrackerStatus(this.#context, status);
-            this.#context.trackers.append(statusTracker);
-          }
-        }
-      });
-    }
-
-    // NOTE: Used in action-builder's Conditions.
-    getStatusEffect(name) {
-      return this.#context.trackers.getActiveTracker("Status Effect", name);
-    }
-
-    #getBuffsByType(type) {
-      return this.#context.trackers.getActiveTrackersByType("Status Effect")?.flatMap((e) => {
-        if (e.effect.type === type) {
-          return [e];
-        } else {
-          return [];
-        }
-      });
-    }
-
-    #consumeStatusEffects(statuses) {
-      for (const status of statuses.flat(1)) {
-        const effect = status.effect;
-        if (effect.uses !== -1) {
-          effect.uses -= 1;
-        }
-        if (effect.uses === 0) {
-          status.active = false;
-          // TODO: Expiration event
-        }
-      }
-    }
-  };
-
-  /** Tracker type made for registering Damage over Time events. */
-  static TrackerDoT = class TrackerDoT extends TrackerBase {
-    #context;
-    eventType = "Damage over Time";
-
-    constructor(ctx, name, potency, duration, effects) {
-      super();
-      this.#context = ctx;
-      this.eventName = name;
-      this.refresh(potency, duration, effects, true);
-    }
-
-    generateEvent(level, jobAbbr, stats) {
-      super.generateEvent();
-      if (this.duration === 0) {
-        this.active = false;
-        return;
-      }
-
-      const damage = calculateDamage(level, jobAbbr, stats, this.potency, false, true, this.snapshottedEffects);
-      this.timer = DOT_TICKRATE;
-      this.#context.sendEventDamage(this.eventType, this.eventName, damage, { potency: this.potency });
-    }
-
-    refresh(potency, newDuration, snapshottedEffects, isNew = false) {
-      this.potency = potency;
-      this.duration = newDuration;
-      this.timer = 0; // In reality the first tick is held till the next server tick
-      this.snapshottedEffects = snapshottedEffects;
-      this.active = true;
-
-      let state = "Reapplied";
-      if (isNew) {
-        state = "Applied";
-      }
-
-      this.#context.sendEventWithState(this.eventType, this.eventName, state, {
-        potency: potency,
-        duration: this.duration,
-        snapshots: this.snapshottedEffects,
-      });
-    }
-  };
-
-  /** Special Tracker type made for handling various status effects applied by various means */
-  static TrackerStatus = class TrackerStatus extends TrackerBase {
-    #context;
-
-    eventType = "Status Effect";
-
-    constructor(ctx, effect) {
-      super();
-      this.#context = ctx;
-      this.eventName = effect.name;
-      this.duration = effect.duration;
-      this.timer = Infinity;
-      this.effect = effect;
-      this.#context.sendEventWithState(this.eventType, this.eventName, "Applied", effect);
-    }
-
-    refresh(newDuration) {
-      this.duration = newDuration;
-      this.active = true;
-      this.#context.sendEventWithState(this.eventType, this.eventName, "Reapplied", this.effect);
-    }
-  };
+export class StandardSimulation {
+  #statsOverwrite;
+  #effects = new ArrayEx();
+  #dots = [];
+  // #actionList = [];
 
   constructor(gearset) {
     this.gearset = gearset;
     this.reset();
   }
 
+  /** Does not reset overwritten stats */
   reset() {
-    this.events = [];
+    this.#effects = new ArrayEx();
+    this.#dots = [];
+    // this.#actionList = [];
+
     this.elapsed = 0;
-    this.trackers = new TrackerArray();
-    this.trackers.append(new TimeTrackerSimulation.TrackerGlobalCooldown(this));
+    this.fightDuration = 0;
+    this.startingPoint = 0;
+    this.lastGCD = null;
+    this.events = [];
   }
 
   /** Base layer of an event object */
-  EventObjectBase = function (elapsed, type, name, category) {
+  EventObjectBase = function (elapsed, type, name) {
     this.elapsed = rnd(elapsed, 3);
-    this.category = category;
     this.type = type;
     this.name = name;
   };
 
   /** Appends a regular damage event */
-  sendEventDamage(type, name, damage, data) {
+  sendEventAction(name, data) {
     const event = {
-      ...new this.EventObjectBase(this.elapsed, type, name, "Damage"),
-      damage: damage,
+      ...new this.EventObjectBase(this.elapsed, "Action", name),
       data: data,
     };
     this.events.push(event);
+    return event;
   }
 
   /** Appends an event with a state */
-  sendEventWithState(type, name, state, data) {
+  sendEventState(type, name, state, data) {
     const event = {
-      ...new this.EventObjectBase(this.elapsed, type, name, "State"),
+      ...new this.EventObjectBase(this.elapsed, type, name),
       state: state,
       data: data,
     };
@@ -309,126 +86,328 @@ export class TimeTrackerSimulation {
   }
 
   /** Appends an error event */
-  sendEventError(type, name, error) {
+  sendEventError(name, error) {
     const event = {
-      ...new this.EventObjectBase(this.elapsed, type, name, "Error"),
+      ...new this.EventObjectBase(this.elapsed, "Error", name),
       message: error,
     };
     this.events.push(event);
   }
 
-  extractGCDsFromActionList(actions) {
-    return actions.flatMap((action) => {
-      if (action.isGCD) {
-        return [action];
+  get stats() {
+    return this.#statsOverwrite ? this.#statsOverwrite : this.gearset.stats;
+  }
+  set stats(newStats) {
+    this.#statsOverwrite = newStats;
+  }
+
+  get remainingTime() {
+    return this.fightDuration - this.elapsed;
+  }
+
+  isActive(obj) {
+    return obj.startTime <= this.elapsed && obj.endTime >= this.elapsed;
+  }
+
+  getValidActionBuffs(action) {
+    const activeBuffs = this.#effects.getActive(this.elapsed).filter((buff) => {
+      const usedOn = buff.usedOn?.(action);
+      if (usedOn === true) {
+        buff.onUse?.(action);
+        return true;
+      } else if (usedOn === undefined) {
+        return true;
       } else {
-        return [];
+        return false;
       }
     });
+    return activeBuffs;
   }
 
-  simCombatLoop(
-    stats,
-    predefinedActions,
-    duration = 60,
-    startingPoint = 0,
-    endSimWhenPredefActionsEnd = false,
-    simulateAutos = true
-  ) {
-    this.elapsed = startingPoint;
-
-    const trackerGCD = this.trackers[0];
-    if (simulateAutos) {
-      this.trackers.append(new TimeTrackerSimulation.TrackerAutos(this, this.gearset.job.autoPotency));
-    }
-
-    const gcds = this.extractGCDsFromActionList(predefinedActions);
-    trackerGCD.predefinedGCDList = gcds;
-
-    while (this.elapsed <= duration) {
-      // Event generation loop
-      for (let tracker of this.trackers) {
-        if (tracker.timer === 0 && tracker.active) {
-          tracker.generateEvent(100, "DRG", stats);
-        }
-      }
-
-      if (trackerGCD.gcdStepper.done && trackerGCD.active) {
-        if (endSimWhenPredefActionsEnd) {
-          break;
-        } else {
-          trackerGCD.active = false;
-        }
-      }
-
-      // Time advancing loop
-      const activeTrackers = this.trackers.getActive();
-      const timeSkip = Math.min(...activeTrackers.map((tracker) => tracker.timer ?? Infinity));
-      for (let tracker of activeTrackers) {
-        tracker.timer -= timeSkip;
-
-        if (tracker.eventType === "Damage over Time" || tracker.eventType === "Status Effect") {
-          tracker.duration -= timeSkip;
-          if (tracker.duration <= 0) {
-            tracker.active = false;
-            // tracker.data is currently always undefined due to individual implementation of each tracker
-            // Do I really need to include data for expired dots and effects?
-            this.sendEventWithState(tracker.eventType, tracker.eventName, "Expired", tracker.data);
-          }
-        }
-      }
-      this.elapsed += timeSkip;
-    }
-
-    // Correcting for timeskip overshooting at the end of a simulation
-    if (this.elapsed > duration) {
-      this.elapsed = duration;
-    }
+  getActiveStatus(name) {
+    return this.#effects.find((e) => e.name === name && this.isActive(e));
   }
 
-  getEventTotalDamageByType(type) {
-    const damageInstances = this.events.flatMap((event) => {
-      if (event.type === type && event.category === "Damage") return [event.damage];
-      else return [];
-    });
-    try {
-      return damageInstances.reduce((total, instance) => {
-        return {
-          base: total.base + instance?.base ?? 0,
-          expected: total.expected + instance?.expected ?? 0,
-        };
-      });
-    } catch {
-      return { base: 0, expected: 0 };
-    }
-  }
-
-  printEvents() {
-    console.table(this.events);
-  }
-
-  printSimulationInformation() {
-    this.printEvents();
-
-    // Great Googly Moogly
-    console.log(`Time Elapsed: ${this.elapsed} Seconds. \nTracker Information:`);
-    let totalDamage = {};
-    this.trackers.forEach((tracker) => {
-      const trackerDamage = this.getEventTotalDamageByType(tracker.eventType);
-      totalDamage = sumObjectsByKey(totalDamage, trackerDamage);
-
-      const logMsg = `\tType: ${tracker.eventType}, ${
-        tracker.eventType === "Status Effect" || tracker.eventType === "Damage over Time" ? `Name: ${tracker.eventName}, ` : ""
-      }Hits: ${tracker.triggerCounter}, Damage: ${trackerDamage.expected.toFixed(2)}`;
-
-      console.log(logMsg);
-    });
-    console.log(`Total Damage: { base: ${totalDamage.base}, expected: ${totalDamage.expected} }`);
-
-    const dps = {
-      base: (totalDamage.base / this.elapsed).toFixed(3),
-      expected: (totalDamage.expected / this.elapsed).toFixed(3),
+  //
+  recordStatus(status, duration, stackDelta) {
+    const record = {
+      ...status,
+      startTime: this.elapsed,
+      endTime: this.elapsed + duration,
+      stacks: status.stacks + (stackDelta ?? 0),
     };
-    console.log(`Base DPS: ${dps.base}, Expected DPS: ${dps.expected}`);
+
+    this.#effects.push(record);
+    return record;
+  }
+
+  // Futureproofing NOTE: Some buffs' duration can be extended up to a max. Similar function to this?
+  setBuffStacks(buff, stackDelta) {
+    const newStacks = buff.stacks + stackDelta;
+    // wacky method of clipping
+    stackDelta = Math.min(newStacks, buff.maxStacks ?? 1) - buff.stacks;
+
+    if (newStacks <= 0) {
+      this.deactivateStatus(buff);
+    } else {
+      this.recordStatus(buff, buff.duration, stackDelta);
+    }
+  }
+
+  consumeActiveBuffs(buffs) {
+    buffs.forEach((buff) => {
+      if (buff.stacks !== -1) {
+        this.setBuffStacks(buff, -1);
+      }
+    });
+  }
+
+  deactivateStatus(status) {
+    status.endTime = this.elapsed;
+  }
+
+  evaluateBuffs(buffs) {
+    let parsed = {
+      damage: 1,
+      crit: 0,
+      direct: 0,
+      autocrit: false,
+      autodirect: false,
+      //haste: 0,
+    };
+
+    buffs.forEach((buff) => {
+      const effect = buff.effect;
+      if (!effect) {
+        return;
+      }
+
+      // Minuscule floating point precision errors. Shouldn't have any effect.
+      if (effect.damage) {
+        parsed.damage *= 1 + effect.damage;
+      }
+      parsed.crit += effect.crit ?? 0;
+      parsed.direct += effect.direct ?? 0;
+      // parsed.haste += effect.haste ?? 0;
+      parsed.autocrit = parsed.autocrit || (effect.autocrit ?? false);
+      parsed.autodirect = parsed.autodirect || (effect.autodirect ?? false);
+    });
+
+    parsed.damage = Number((parsed.damage - 1).toPrecision(15));
+    return parsed;
+  }
+
+  getActiveDot(name) {
+    return this.#dots.find((e) => e.name === name && this.isActive(e));
+  }
+
+  recordDot(dot, applicationDelay, buffs) {
+    const delayTime = this.elapsed + applicationDelay;
+    const dotBuffs = {
+      damage: buffs.damage,
+      crit: buffs.crit,
+      direct: buffs.direct,
+      // haste?
+    };
+
+    const record = {
+      name: dot.name,
+      duration: dot.duration,
+      potency: dot.potency,
+      type: dot.type,
+      buffs: dotBuffs,
+      startTime: delayTime,
+      endTime: delayTime + dot.duration,
+      // Max possible tick count. Overwritten if dot is refreshed early
+      tickCount: dot.duration / DOT_TICKRATE,
+    };
+
+    this.#dots.push(record);
+    return record;
+  }
+
+  // Inaccurate due to the inherent inaccuracy of server ticks
+  dotActualTickCount(dot, currentTime) {
+    return Math.min(Math.floor(currentTime / DOT_TICKRATE) - Math.floor(dot.startTime / DOT_TICKRATE), dot.tickCount);
+  }
+
+  handleAction(action) {
+    const conditionRes = action.condition?.call(this, this);
+    if (conditionRes === false) {
+      this.sendEventError(action.name, "Action condition failed.");
+      return false;
+    }
+
+    // TODO: revamp the combo check to not rely on other actions (chain of values)
+    //       combos should expire after 30s of no interaction
+    const comboValid = action.checkCombo?.(this.lastGCD?.name, this.comboState) ?? true;
+    this.comboState = comboValid;
+
+    const potency = comboValid ? action?.comboPotency ?? action.potency : action.potency;
+    if (potency < 0) {
+      this.sendEventError(action.name, "Followup action unavailable.");
+      return false;
+    }
+
+    // Buffs snapshot on cast for non-spells and at `castTimer - 0.5s` for spells
+    const activeBuffs = this.getValidActionBuffs(action);
+    const buffs = this.evaluateBuffs(activeBuffs);
+    const damage =
+      potency !== 0
+        ? calculateDamage(this.gearset.level, this.gearset.jobCode, this.stats, potency, action.type, false, false, buffs)
+        : 0;
+
+    this.consumeActiveBuffs(activeBuffs);
+
+    let eventInitData = {
+      potency: potency,
+      damage: damage,
+      applicationDelay: action.applicationTime,
+      combo: comboValid,
+      effects: activeBuffs,
+      buffs: buffs,
+    };
+
+    action.statuses?.forEach((status) => {
+      if ((status.requireCombo && comboValid) || !status.requireCombo) {
+        eventInitData.appliedEffect ??= [];
+        const activeStatus = this.getActiveStatus(status.name);
+        const refresh = Boolean(activeStatus);
+
+        if (refresh) {
+          activeStatus.endTime = this.elapsed;
+        }
+
+        // `recordStatus` parameters:
+        // If the buff gains duration up to a max, compute & use the new duration (active status deltaTime + status.duration)
+        // If the buff gains stacks up to a max, compute & use the new delta
+
+        // if (blablabla buff gains stacks) {
+        //  var stacksDelta = something;
+        // }
+
+        eventInitData.appliedEffect.push({ ...this.recordStatus(status, status.duration), refreshed: refresh });
+        this.sendEventState("Status Effect", status.name, refresh ? "Reapplied" : "Applied", status);
+      }
+    });
+
+    // Logs show status effects applying before, but not affecting, damage application
+    const event = this.sendEventAction(action.name, eventInitData);
+
+    // Can't remember if there are any abilities that apply multiple dots, but even if not, guess this is futureproofing?
+    action.dots?.forEach((dot) => {
+      if ((dot.requireCombo && comboValid) || !dot.requireCombo) {
+        const activeDot = this.getActiveDot(dot.name);
+        const dotFound = Boolean(activeDot);
+
+        event.data.appliedDot ??= [];
+
+        if (dotFound) {
+          // Cut off active dot's time and set tickCount accordingly
+          activeDot.tickCount = this.dotActualTickCount(activeDot, this.elapsed + action.applicationTime);
+          activeDot.endTime = this.elapsed + action.applicationTime;
+        }
+        event.data.appliedDot?.push({ ...this.recordDot(dot, action.applicationTime, buffs), refreshed: dotFound });
+
+        // Refactor NOTE: I dislike how status effects append to eventInitData while dots append to the registered event.
+        //  It's done this way to keep the correct order of events (status -> action -> dot)
+        //  But these events aren't truly needed when #dots and #effects record all instances of their respective types, and their mutations.
+        this.sendEventState("Damage over Time", dot.name, dotFound ? "Reapplied" : "Applied", dot);
+      }
+    });
+
+    return true;
+  }
+
+  finalize() {
+    // Correcting for timeskip overshooting at the end of a simulation
+    this.elapsed = Math.min(this.elapsed, this.fightDuration);
+
+    // iterating over dot applications and calculating their total damage based on
+    // the number of actual ticks and their snapshotted damage buffs.
+    // Refactor NOTE: action events store applied dots, but these don't share the same reference as #dots records
+    //    An easy fix is to change the way new dots are pushed into action events, but maybe a design change is in order?
+    //    The same issue likely applies to status effects as well.
+    //    Not critical at the moment but would have implications on effective dps later on.
+    this.events.forEach((event) => {
+      if (event.type !== "Action") {
+        return;
+      }
+
+      const dots = event.data.appliedDot ?? [];
+      for (const dot of dots) {
+        // Cut off any ongoing dots
+        if (this.isActive(dot)) {
+          dot.tickCount = this.dotActualTickCount(dot, this.elapsed);
+          dot.endTime = this.elapsed;
+        }
+
+        const consolidated = calculateDamage(
+          this.gearset.level,
+          this.gearset.jobCode,
+          this.stats,
+          dot.potency,
+          dot.type,
+          false,
+          true,
+          dot.buffs
+        );
+
+        dot.totalDamage = { base: consolidated.base * dot.tickCount, expected: consolidated.expected * dot.tickCount };
+      }
+    });
+  }
+
+  simulate(actionList, duration, start = 0, endWhenNoActions = false, simAutoAttacks = true) {
+    // this.#actionList = actionList;
+
+    if (simAutoAttacks) {
+      var actionAutoAttack = {
+        name: "Auto Attack",
+        type: "ability",
+        potency: this.gearset.job.autoPotency,
+        isGCD: false,
+        damageType: "physical",
+      };
+    }
+
+    this.elapsed = start;
+    this.fightDuration = duration;
+    this.startingPoint = start;
+
+    let index = 0;
+    let timeTillGCD = 0;
+    let lastActionSuccess = true;
+    while (this.elapsed <= this.fightDuration) {
+      const action = index < actionList.length ? actionList[index] : null;
+      if (action === null && endWhenNoActions) {
+        break;
+      }
+
+      // snap to GCD if applicable and not clipping
+      if (action.isGCD && lastActionSuccess && timeTillGCD > 0) {
+        this.elapsed += timeTillGCD;
+      }
+
+      lastActionSuccess = this.handleAction(action);
+      this.lastGCD = action.isGCD ? action : this.lastGCD;
+
+      // Advance time elapsed TODO: Auto attacks
+      if (lastActionSuccess) {
+        if (action.isGCD) {
+          timeTillGCD = action.baseRecastTime; // +- calculations based on speed stats, haste, instacasts yada yada
+          var advance = action.baseCastTime + action.animationLock;
+        } else {
+          var advance = action.animationLock;
+        }
+
+        timeTillGCD -= advance;
+        this.elapsed += advance;
+      }
+
+      index++;
+    }
+
+    this.finalize();
   }
 }

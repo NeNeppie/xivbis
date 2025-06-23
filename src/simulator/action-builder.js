@@ -1,3 +1,5 @@
+const DEFAULT_ANIMATION_LOCK = 0.6;
+
 class ActionBuilder {
   CreateBase(name, potency) {
     return {
@@ -8,11 +10,15 @@ class ActionBuilder {
        * Sets the action's timers: Cast Time, Cooldown, Application and Animation.
        * @param {object} timers
        */
+      // TODO: Some GCDs have a long cooldown but don't affect the recast time e.g. SMN summons
+      //       Some GCDs have longer/shorter than usual recast timers e.g. Picto
+      //       So I need a separate `cooldown` property
       setTimers(timers) {
-        this.baseCastTime = timers.baseCastTime;
-        this.baseRecastTime = timers.baseRecastTime;
-        this.applicationTime = timers.applicationTime;
-        this.animationLock = timers.animationLock;
+        this.baseCastTime = timers.baseCastTime ?? 0;
+        this.baseRecastTime = timers.baseRecastTime ?? 0.6;
+        this.cooldown = timers.cooldown ?? 0;
+        this.applicationTime = timers.applicationTime ?? 0;
+        this.animationLock = timers.animationLock ?? DEFAULT_ANIMATION_LOCK;
         return this;
       },
 
@@ -39,8 +45,8 @@ class ActionBuilder {
        * @param {function} callback
        */
       setCondition(callback) {
-        this.condition = function () {
-          const res = callback.call(this);
+        this.condition = function (args) {
+          const res = callback.call(this, args);
           return !res ? false : res;
         };
         return this;
@@ -50,18 +56,19 @@ class ActionBuilder {
        * Appends a Damage over Time object to the action.
        * @param {number} duration DoT Duration
        * @param {number} potency DoT Potency
-       * @param {boolean} linkToCombo Whether the effect should only trigger on successful combo execution
+       * @param {boolean} requireCombo Whether the effect should only trigger on successful combo execution
        */
-      addDamageOverTime(duration, potency, linkToCombo) {
-        linkToCombo = this.comboActions ? linkToCombo : false;
+      addDamageOverTime(duration, potency, dmgType, requireCombo) {
+        requireCombo = this.comboActions ? requireCombo : false;
 
         this.dots ??= [];
-
         this.dots.push({
           name: this.name,
+          // TODO: Ground DoTs (Salted Earth, Doton, etc.) gain an additional damage tick on application (provided the enemy is in range at the time)
           duration: duration,
           potency: potency,
-          onSuccessfulCombo: linkToCombo,
+          type: dmgType,
+          requireCombo: requireCombo,
         });
         return this;
       },
@@ -69,26 +76,46 @@ class ActionBuilder {
       /**
        * Appends a Status Effect to the action.
        * @param {object} status Status Effect object
-       * @param {boolean} linkToCombo Whether the effect should only trigger on successful combo execution
+       * @param {boolean} requireCombo Whether the effect should only trigger on successful combo execution
        */
-      addStatusEffect(status, linkToCombo) {
+      addStatusEffect(status, requireCombo = true) {
         this.statuses ??= [];
-        this.statuses.push({ ...status, onSuccessfulCombo: linkToCombo });
+        this.statuses.push({ ...status, requireCombo: requireCombo });
         return this;
       },
     };
   }
 
-  CreateBaseGCD(name, potency) {
+  CreateWeaponskill(name, potency, dmgType = "physical") {
     let action = this.CreateBase(name, potency);
     action.isGCD = true;
+    action.type = "weaponskill";
+    action.damageType = dmgType;
     return action;
   }
 
-  CreateBaseOGCD(name, potency) {
+  CreateSpell(name, potency, dmgType = "magic") {
+    let action = this.CreateBase(name, potency);
+    action.isGCD = true;
+    action.type = "spell";
+    action.damageType = dmgType;
+    return action;
+  }
+
+  CreateBaseOGCD(name, potency, dmgType) {
     let action = this.CreateBase(name, potency);
     action.isGCD = false;
+    action.type = "ability";
+    action.damageType = dmgType;
     return action;
+  }
+
+  CreateOGCDMagic(name, potency) {
+    return this.CreateBaseOGCD(name, potency, "magic");
+  }
+
+  CreateOGCDPhysical(name, potency) {
+    return this.CreateBaseOGCD(name, potency, "physical");
   }
 }
 

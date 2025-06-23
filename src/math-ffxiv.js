@@ -1,6 +1,6 @@
 import { jobs } from "./constants/job-consts.js";
 import { jobModifiers, levelModifiers, tribalStats } from "./constants/modifiers.js";
-import { cel, flr, sumObjectsByKey } from "./utils/math-utils.js";
+import { cel, flr } from "./utils/math-utils.js";
 
 function calcBaseAttribute(lv, job, tribe, stat) {
   const tribeStat = tribalStats[tribe][stat];
@@ -90,6 +90,10 @@ function getDeterminationMultiplier(lv, statDET) {
   return (1000 + getMainstatModifier(lv, statDET, 140)) / 1000;
 }
 
+function getAutoDirectHitMultiplier(lv, statDH) {
+  return getSubstatModifier(lv, statDH, 140) / 10;
+}
+
 function getSpeedMultiplier(lv, statSpeed) {
   return (1000 + getSubstatModifier(lv, statSpeed, 130)) / 1000;
 }
@@ -110,38 +114,108 @@ function getGlobalCoolDown(lv, statSpeed, baseGCD) {
 
 /**
  * Basic function for base damage calculation. Does not factor in Critical Hit and Direct Hit.
+ * @param {Number} level Supported character level
+ * @param {String} job Abbreviated Job name e.g. "DRG"
+ * @param {Gearset.stats} stats Character stats
+ * @param {Number} potency Action potency
+ * @param {String} actionType Determines which Speed stat is used.
  */
-export function calculateBaseDamage(level, job, stats, potency, isAuto = false, isDot = false, buffDmg = 0) {
+export function calculateBaseDamage(level, job, stats, potency, actionType, isAuto = false, isDot = false, buffs) {
   const attribute = isAuto ? stats[jobs[job].autoStat] : stats[jobs[job].mainStat];
-  const speedStat = isAuto /* || attackType === Weaponskill */ ? stats.spdSkill : stats.spdSpell;
+  const speedStat = isAuto || actionType === "physical" || actionType === "weaponskill" ? stats.spdSkill : stats.spdSpell;
 
   const multiplierSPD = isAuto || isDot ? getSpeedMultiplier(level, speedStat) : 1.0;
   const multiplierAP = getAttackPower(level, job, attribute);
   const multiplierDET = getDeterminationMultiplier(level, stats.determination);
+  // FIXME: something doesn't add up here
+  const multiplierAutoDH = getAutoDirectHitMultiplier(level, stats.directHit);
   const multiplierTNC = getTenacityMultiplier(level, job, stats.tenacity);
-  // TODO: Distinguish between Physical (Weaponskill) & Magical (Spell). Magic uses a slightly different formula
-  //       Calculations while under the effect of a Crit Direct Hit Guarantee buff.
+
+  if (buffs.autodirect) {
+    // flr((det + dh - 1) * 1000) / 1000
+    multiplierDET = multiplierDET + multiplierAutoDH - 1;
+  }
+
   const multiplierWD = isAuto
     ? getAutoAttackModifier(level, job, stats.wdPhys, stats.delay)
     : getWeaponDamageMultiplier(level, job, stats.wdPhys);
 
-  let damage = flr((potency / 100) * multiplierWD * flr(multiplierAP * multiplierDET, 2)) * multiplierTNC * multiplierSPD;
-  // console.log(
-  //   `DMG = (${potency}p * ${multiplierWD}wd * (${multiplierAP}ap * ${multiplierDET}det)) * ${multiplierTNC}tnc (* ${multiplierSPD}spd)`
-  // );
+  // NOTE: BLU has an action that uses the non-caster formula despite being a caster job
+  if ((jobs[job].role === "caster" || jobs[job].role === "healer") && !isAuto) {
+    var damage = 0;
+    // TODO: Caster formula for magical jobs.
+    // Damage type actually has nothing to do with the damage formula; it only affects the speed stat used in calculations
+  } else {
+    // Re-insert flooring according to Non-caster formula
+    // var damage2 = flr(
+    //   flr(flr(flr((potency / 100) * multiplierAP * multiplierDET) * multiplierTNC) * multiplierSPD) * multiplierWD
+    // );
 
-  const trait = jobs[job].traitBonus;
-  if (typeof trait !== "undefined") {
-    damage *= trait;
+    var damage = flr((potency / 100) * multiplierWD * flr(multiplierAP * multiplierDET, 2)) * multiplierTNC * multiplierSPD;
   }
+
+  damage *= jobs[job].traitBonus ?? 1;
   if (potency < 100) {
     damage += 1;
   }
 
-  // TODO: Research standard deviation / uniform distribution
-  //return D2 * (getRandomInt(95, 105) / 100) /* * getBuffs() calculate afterwards */;
-  damage += damage * buffDmg;
+  //damage *= (getRandomInt(95, 105) / 100);
+  damage += damage * buffs.damage;
   return flr(damage, 2);
+}
+
+function applyAutoCrit(level, statCrit, damage, bonusCritRate) {
+  const multiplierCrit = getCritMultiplier(level, statCrit);
+  const criticalHitBonus = 1 + bonusCritRate * (multiplierCrit - 1);
+
+  return flr(damage * multiplierCrit * criticalHitBonus, 2);
+}
+
+function multAutoCrit(level, statCrit, bonusCritRate) {
+  const multiplierCrit = getCritMultiplier(level, statCrit);
+  const criticalHitBonus = 1 + bonusCritRate * (multiplierCrit - 1);
+
+  return multiplierCrit * criticalHitBonus;
+}
+
+function applyCritHit(level, statCrit, damage, bonusCritRate) {
+  const multiplierCrit = getCritMultiplier(level, statCrit);
+  const probabilityCrit = getCritHitRate(level, statCrit) / 100;
+
+  const criticalHit = 1 + (probabilityCrit + bonusCritRate) * (multiplierCrit - 1);
+  return flr(damage * criticalHit, 2);
+}
+
+function multCritHit(level, statCrit, bonusCritRate) {
+  const multiplierCrit = getCritMultiplier(level, statCrit);
+  const probabilityCrit = getCritHitRate(level, statCrit) / 100;
+
+  return 1 + (probabilityCrit + bonusCritRate) * (multiplierCrit - 1);
+}
+
+function applyAutoDirect(damage, bonusDirectRate) {
+  const directHitBonus = 1 + bonusDirectRate * 0.25;
+
+  return flr(damage * 1.25 * directHitBonus, 2);
+}
+
+function multAutoDirect(bonusDirectRate) {
+  const directHitBonus = 1 + bonusDirectRate * 0.25;
+
+  return 1.25 * directHitBonus;
+}
+
+function applyDirectHit(level, statDH, damage, bonusDirectRate) {
+  const probabilityDirect = getDirectHitRate(level, statDH) / 100;
+
+  const directHit = 1 + (probabilityDirect + bonusDirectRate) * 0.25;
+  return flr(damage * directHit, 2);
+}
+
+function multDirectHit(level, statDH, bonusDirectRate) {
+  const probabilityDirect = getDirectHitRate(level, statDH) / 100;
+
+  return 1 + (probabilityDirect + bonusDirectRate) * 0.25;
 }
 
 /**
@@ -152,8 +226,6 @@ export function applyCritDh(level, baseDamage, stats, buffCrit = 0, buffDirect =
   const probabilityCrit = getCritHitRate(level, stats.crit) / 100;
   const probabilityDirect = getDirectHitRate(level, stats.directHit) / 100;
 
-  //console.log(`critRate: ${probabilityCrit}, directRate: ${probabilityDirect}, critMult: ${multiplierCrit}`);
-
   const directHit = 1 + (probabilityDirect + buffDirect) * 0.25;
   const criticalHit = 1 + (probabilityCrit + buffCrit) * (multiplierCrit - 1);
   return flr(baseDamage * directHit * criticalHit, 2);
@@ -162,9 +234,24 @@ export function applyCritDh(level, baseDamage, stats, buffCrit = 0, buffDirect =
 /**
  * Performs action damage calculation. Returns computed damage with and without Crit/Direct Hit applied
  */
-export function calculateDamage(level, job, stats, potency, isAuto = false, isDot = false, buffs = {}) {
-  const dmgBase = calculateBaseDamage(level, job, stats, potency, isAuto, isDot, buffs.damage);
-  const dmgExpected = applyCritDh(level, dmgBase, stats, buffs.crit, buffs.direct);
+export function calculateDamage(level, job, stats, potency, dmgType, isAuto = false, isDot = false, buffs = {}) {
+  const baseDamage = calculateBaseDamage(level, job, stats, potency, dmgType, isAuto, isDot, buffs);
 
-  return { base: dmgBase, expected: dmgExpected };
+  // const critStep = buffs.autocrit
+  //   ? applyAutoCrit(level, stats.crit, baseDamage, buffs.crit)
+  //   : applyCritHit(level, stats.crit, baseDamage, buffs.crit);
+  // const completeDamage = buffs.autodirect
+  //   ? applyAutoDirect(damageCrit, buffs.direct)
+  //   : applyDirectHit(level, stats.directHit, damageCrit, buffs.direct);
+
+  const multiplierCritDamage = buffs.autocrit
+    ? multAutoCrit(level, stats.crit, buffs.crit)
+    : multCritHit(level, stats.crit, buffs.crit);
+  const multiplierDhDamage = buffs.autodirect
+    ? multAutoDirect(buffs.direct)
+    : multDirectHit(level, stats.directHit, buffs.direct);
+  const expectedDamage = flr(baseDamage * multiplierCritDamage * multiplierDhDamage, 2);
+
+  // Maybe do away with base and expected damage. `base` no longer provides meaningful information
+  return { base: baseDamage, expected: expectedDamage };
 }
