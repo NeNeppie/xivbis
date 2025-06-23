@@ -17,9 +17,11 @@ The foundation. Stat & Damage calculations
 
     ✅ Support for auto attacks
     ✅ Support for DoTs (affected by speed)
-    - Support for guaranteed crits (Reassemble, etc.)
+    🟨 Support for guaranteed crits (Reassemble, etc.)
     ✅ Support for party buffs (all types)
-    - Trait bonus for SCH and SMN pets (+30%) [3]
+    - Support for pets:
+        - Damage dealing pets (SMN, Queen, Esteem)
+        - Trait bonus for SCH and SMN pets (+30%) [3]
     - Healing and HP calculations
     🟨 Support for ALL Equipment levels
 
@@ -46,16 +48,41 @@ Implementing realistic damage calculation by simulating a damage rotation for a 
     ✅ Calculating Autos, accounting for SkS and weapon type
     - Supporting action types:
         ✅ GCDs
-        - oGCDs (weaving, anim locks, etc.)
+        ✅ oGCDs (weaving, anim locks, etc.)
         ✅ DoTs
         ✅ Combos
         ✅ Status granters / inflicters
-    - Write down all actions for each job
-    - Build an actual rotation for each job
-        - ( Status table for all jobs will go here in the future )
+        🟨 Autoattacks
     - Add support for potion uses
     - Add support for party buffs & bursts
     - Level backwards compatiblity
+
+#### Job Status Table
+
+|         Job | Actions | Rotation |
+| ----------: | :-----: | :------: |
+|     Paladin |   ❌    |    ❌    |
+|     Warrior |   ❌    |    ❌    |
+| Dark Knight |   ❌    |    ❌    |
+|  Gunbreaker |   ❌    |    ❌    |
+|        Monk |   ❌    |    ❌    |
+|     Dragoon |   ✔️    |    ❌    |
+|       Ninja |   ❌    |    ❌    |
+|     Samurai |   ❌    |    ❌    |
+|      Reaper |   ❌    |    ❌    |
+|       Viper |   ❌    |    ❌    |
+|        Bard |   ❌    |    ❌    |
+|   Machinist |   ❌    |    ❌    |
+|      Dancer |   ❌    |    ❌    |
+|  White Mage |   ❌    |    ❌    |
+|     Scholar |   ❌    |    ❌    |
+| Astrologian |   ❌    |    ❌    |
+|        Sage |   ❌    |    ❌    |
+|  Black Mage |   ❌    |    ❌    |
+|    Summoner |   ❌    |    ❌    |
+|    Red Mage |   ❌    |    ❌    |
+| Pictomancer |   ❌    |    ❌    |
+|   Blue Mage |   TBD   |   TBD    |
 
 ### Bruteforce stage `[4]`:
 
