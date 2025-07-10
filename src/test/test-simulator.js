@@ -1,6 +1,6 @@
 import { Gearset } from "../gearset.js";
 import * as Actions from "../simulator/DRG/drg-actions.js";
-import { StandardSimulation } from "../simulator/simulator.js";
+import { StandardSimulationDRG } from "../simulator/DRG/drg-simulator.js";
 import { assert, describe, it } from "./test-framework.js";
 
 const debugGearset = new Gearset(100, "DRG");
@@ -30,7 +30,7 @@ As a proof of concept I'll use:
 */
 
 describe("Tracker-based Simulator Testing", () => {
-  const simulator = new StandardSimulation(debugGearset);
+  const simulator = new StandardSimulationDRG(debugGearset);
   simulator.stats = debugGearset.debugStats;
 
   describe("Running combo actions in the simulator", () => {
@@ -294,7 +294,7 @@ describe("Tracker-based Simulator Testing", () => {
     ];
 
     simulator.reset();
-    simulator.simulate(actions, 60, 0, true, true);
+    simulator.simulate(actions, 60, 0, false, true);
     console.table(simulator.events);
     // simulator.events.forEach((e) => {
     //   console.dir(e, { depth: 3 });

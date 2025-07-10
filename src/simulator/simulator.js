@@ -1,5 +1,6 @@
 import { calculateDamage } from "../math-ffxiv.js";
 import { rnd } from "../utils/math-utils.js";
+import { SimulationGaugeRecorder } from "./gauge-recorder.js";
 
 const DOT_TICKRATE = 3;
 // const TIME_ADVANCEMENT_PING_DELAY = 0.02;
@@ -44,11 +45,13 @@ export class StandardSimulation {
 
   constructor(gearset) {
     this.gearset = gearset;
+    this.gauge = new SimulationGaugeRecorder(this.#elapsedTime);
     this.reset();
   }
 
   /** Does not reset overwritten stats */
   reset() {
+    this.gauge.initialize();
     this.#cooldowns.clear();
     this.#effects = new ArrayEx();
     this.#dots = [];
@@ -122,6 +125,8 @@ export class StandardSimulation {
         }
       }
     });
+
+    // Set elapsed time for any tracker objects or complex classes such as GaugeTracker
   }
 
   get remainingTime() {
@@ -328,7 +333,7 @@ export class StandardSimulation {
       buffs: buffs,
     };
 
-    action.statuses?.forEach((status) => {
+    action.statusInfo?.forEach((status) => {
       if ((status.requireCombo && comboValid) || !status.requireCombo) {
         eventInitData.appliedEffect ??= [];
         const activeStatus = this.getActiveStatus(status.name);
@@ -355,7 +360,7 @@ export class StandardSimulation {
     const event = this.sendEventAction(action.name, eventInitData);
 
     // Can't remember if there are any abilities that apply multiple dots, but even if not, guess this is futureproofing?
-    action.dots?.forEach((dot) => {
+    action.dotInfo?.forEach((dot) => {
       if ((dot.requireCombo && comboValid) || !dot.requireCombo) {
         const activeDot = this.getActiveDot(dot.name);
         const dotFound = Boolean(activeDot);
@@ -373,6 +378,23 @@ export class StandardSimulation {
         //  It's done this way to keep the correct order of events (status -> action -> dot)
         //  But these events aren't truly needed when #dots and #effects record all instances of their respective types, and their mutations.
         this.sendEventState("Damage over Time", dot.name, dotFound ? "Reapplied" : "Applied", dot);
+      }
+    });
+
+    action.gaugeInfo?.forEach((info) => {
+      // Are there any actions that modify job gauge without a successful combo?
+      // if ((dot.requireCombo && comboValid) || !dot.requireCombo)
+      const gauge = this.gauge.get(info.name);
+
+      // Redundant if
+      if (info.changeCount !== 0) {
+        gauge.count += info.changeCount;
+      }
+      if (!isNaN(info.setTime)) {
+        gauge.time = info.setTime;
+      }
+      if (info.shouldResetGauge) {
+        gauge.reset();
       }
     });
 
@@ -420,6 +442,8 @@ export class StandardSimulation {
         dot.totalDamage = { base: consolidated.base * dot.tickCount, expected: consolidated.expected * dot.tickCount };
       }
     });
+
+    this.gauge.finalize();
   }
 
   simulate(actionList, duration, start = 0, endWhenNoActions = false, simAutoAttacks = true) {

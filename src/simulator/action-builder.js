@@ -1,7 +1,5 @@
 const DEFAULT_ANIMATION_LOCK = 0.6;
 
-// TODO: Look into decorators (apparently a thing in JS) as replacement for setXYZ functions
-
 class ActionBuilder {
   CreateBase(name, potency) {
     return {
@@ -65,8 +63,8 @@ class ActionBuilder {
       addDamageOverTime(duration, potency, dmgType, requireCombo) {
         requireCombo = this.comboActions ? requireCombo : false;
 
-        this.dots ??= [];
-        this.dots.push({
+        this.dotInfo ??= [];
+        this.dotInfo.push({
           name: this.name,
           // TODO: Ground DoTs (Salted Earth, Doton, etc.) gain an additional damage tick on application (provided the enemy is in range at the time)
           duration: duration,
@@ -83,8 +81,25 @@ class ActionBuilder {
        * @param {boolean} requireCombo Whether the effect should only trigger on successful combo execution
        */
       addStatusEffect(status, requireCombo = true) {
-        this.statuses ??= [];
-        this.statuses.push({ ...status, requireCombo: requireCombo });
+        this.statusInfo ??= [];
+        this.statusInfo.push({ ...status, requireCombo: requireCombo });
+        return this;
+      },
+
+      /**
+       * Appends instructions to manipluate job gauges, on action use, to the action.
+       * @param {string} gaugeName
+       * @param {object} rules Indicates how should the gauge be manipulated:
+       * { `changeCount`: number `setTime`: number `reset`: bool } , all opt.
+       */
+      addGaugeInfo(gaugeName, ruleset) {
+        this.gaugeInfo ??= [];
+        this.gaugeInfo.push({
+          name: gaugeName,
+          changeCount: ruleset.changeCount ?? 0,
+          setTime: ruleset.setTime ?? NaN,
+          shouldResetGauge: ruleset.reset ?? false,
+        });
         return this;
       },
     };

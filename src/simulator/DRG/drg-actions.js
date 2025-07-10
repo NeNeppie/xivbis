@@ -41,11 +41,11 @@ export const actDrakesbane = ActionBuilder.CreateWeaponskill("Drakesbane", -1)
   .setComboAction(["Wheeling Thrust", "Fang and Claw"], 460)
   .addStatusEffect(Statuses.RaidenThrust, true);
 
-// NOTE: Adds a charge to `Firstminds' Focus` gauge
 // prettier-ignore
 export const actRaidenThrust = ActionBuilder.CreateWeaponskill("Raiden Thrust", 320)
   .setTimers({ baseRecastTime: 2.5, applicationTime: 0.62, })
   .setCondition(function(ctx) { return ctx.getActiveStatus("Draconian Fire") })
+  .addGaugeInfo("Firstmind's Focus", { changeCount: 1 });
 
 export const LifeSurge = ActionBuilder.CreateBaseOGCD("Life Surge", 0)
   .setTimers({ cooldown: 40, applicationTime: 0, charges: 2 })
@@ -90,12 +90,11 @@ export const Stardiver = ActionBuilder.CreateBaseOGCD("Stardiver", 840)
   .setCondition(function(ctx) { return ctx.getActiveStatus("Life of the Dragon"); })
   .addStatusEffect(Statuses.StarcrossReady);
 
-// Consider: Actions need some manner of "condition" or "requirement" that is checked on runtime.
-// Raiden Thrust requires a buff from Drakesbane, TODO: Wyrmwind Thrust requires feeling up the eye gauge (states 0,1,2)
 // prettier-ignore
 export const WyrmwindThrust = ActionBuilder.CreateBaseOGCD("Wyrmwind Thrust", 440)
   .setTimers({ cooldown: 10, applicationTime: 1.2 })
-  .setCondition(function(ctx) { return true })
+  .setCondition(function(ctx) { return ctx.gauge.get("Firstmind's Focus")?.count === 2 })
+  .addGaugeInfo("Firstmind's Focus", { reset: true });
 
 // prettier-ignore
 export const RiseoftheDragon = ActionBuilder.CreateBaseOGCD("Rise of the Dragon", 550)
