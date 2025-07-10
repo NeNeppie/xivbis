@@ -1,5 +1,4 @@
-import { jobs } from "../constants/jobstats.js";
-import { convertParamToAbbr, paramToAbbr } from "../gearset.js";
+import { convertParamToAbbr, convertParamToAbbrSingle } from "../gearset.js";
 import { sumObjectsByKey } from "../utils/math-utils.js";
 import { createElementEx } from "./ui-core.js";
 
@@ -12,7 +11,7 @@ export class GearTableContainer {
 
     var div = document.getElementById("gear-group-weapon");
     this.#addTable("weapon", div);
-    if (this.gearset.job === "PLD") {
+    if (this.gearset.jobCode === "PLD") {
       this.#addTable("offhand", div);
     }
 
@@ -25,7 +24,7 @@ export class GearTableContainer {
       this.#addTable(id, div);
     }
 
-    this.#populateTables(this.gearset.job);
+    this.#populateTables(this.gearset.jobCode);
   }
 
   #addTable(id, div) {
@@ -70,7 +69,7 @@ class GearTable extends HTMLTableElement {
   constructor(job) {
     super();
 
-    this.job = jobs[job];
+    this.job = job;
     this.classList.add("tb", "gear-selects");
 
     this.#headers = [
@@ -110,21 +109,21 @@ class GearTable extends HTMLTableElement {
         },
         condition: () => this.id === "weapon",
         colWidth: 40,
-        colClasses: ["stat-cell"], // TEMP: Rename?
+        colClasses: ["stat-cell"],
         headerClasses: ["stat-header"],
       },
     ];
 
     for (const stat of statList) {
       this.#headers.push({
-        name: paramToAbbr[stat],
+        name: convertParamToAbbrSingle(stat),
         callback: (data) => {
           const stats = sumObjectsByKey(data.stats, data.statsHQ);
           return stats[stat] ?? 0;
         },
         condition: () => !this.job.statBlacklist.includes(stat),
         colWidth: 40,
-        colClasses: ["stat-cell"], // TEMP: Rename?
+        colClasses: ["stat-cell"],
         headerClasses: ["stat-header"],
       });
     }

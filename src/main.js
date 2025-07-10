@@ -1,4 +1,3 @@
-import { jobs } from "./constants/jobstats.js";
 import DataManager from "./datamanager.js";
 import { GearTableContainer } from "./frontend/gear-table.js";
 import { Gearset } from "./gearset.js";

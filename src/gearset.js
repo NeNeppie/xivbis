@@ -54,6 +54,10 @@ export function convertParamToAbbr(obj) {
   return translated;
 }
 
+export function convertParamToAbbrSingle(paramKey) {
+  return paramConvertMap[paramKey].code;
+}
+
 export function convertStatKeys(stats, statsHQ) {
   let translated = {};
 
