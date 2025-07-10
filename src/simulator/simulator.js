@@ -305,7 +305,16 @@ export class StandardSimulation {
     const buffs = this.evaluateBuffs(activeBuffs);
     const damage =
       potency !== 0
-        ? calculateDamage(this.gearset.level, this.gearset.jobCode, this.stats, potency, action.type, false, false, buffs)
+        ? calculateDamage(
+            this.gearset.level,
+            this.gearset.jobCode,
+            this.stats,
+            potency,
+            action.type,
+            action.type === "auto" ? true : false,
+            false,
+            buffs
+          )
         : 0;
 
     this.consumeActiveBuffs(activeBuffs);
@@ -419,10 +428,11 @@ export class StandardSimulation {
     if (simAutoAttacks) {
       var actionAutoAttack = {
         name: "Auto Attack",
-        type: "ability",
+        type: "auto",
         potency: this.gearset.job.autoPotency,
         isGCD: false,
         damageType: "physical",
+        baseRecastTime: this.stats.delay,
       };
     }
 
@@ -432,31 +442,52 @@ export class StandardSimulation {
 
     let index = 0;
     let timeTillGCD = 0;
+    let timeTillAuto = 0;
     let lastActionSuccess = true;
-    while (this.elapsed <= this.fightDuration) {
+    while (this.elapsed < this.fightDuration) {
       const action = index < actionList.length ? actionList[index] : null;
       if (action === null && endWhenNoActions) {
         break;
       }
 
       // snap to GCD if applicable and not clipping
-      if (action.isGCD && lastActionSuccess && timeTillGCD > 0) {
+      if (action?.isGCD && lastActionSuccess && timeTillGCD > 0) {
+        if (simAutoAttacks && timeTillAuto <= timeTillGCD) {
+          this.elapsed += timeTillAuto;
+          timeTillGCD -= timeTillAuto;
+          // Affected by certain buffs (e.g. Riddle of Wind). Speed stat affects damage
+          timeTillAuto = actionAutoAttack.baseRecastTime;
+          this.handleAction(actionAutoAttack);
+        }
+
+        timeTillAuto -= simAutoAttacks ? timeTillGCD : 0;
         this.elapsed += timeTillGCD;
       }
 
-      lastActionSuccess = this.handleAction(action);
-      this.lastGCD = action.isGCD ? action : this.lastGCD;
+      lastActionSuccess = action ? this.handleAction(action) : true;
+      this.lastGCD = action?.isGCD ? action : this.lastGCD;
 
-      // Advance time elapsed TODO: Auto attacks
+      // Advance time elapsed
       if (lastActionSuccess) {
-        if (action.isGCD) {
+        if (action?.isGCD) {
           timeTillGCD = action.baseRecastTime; // +- calculations based on speed stats, haste, instacasts yada yada
           var advance = action.baseCastTime + action.animationLock;
         } else {
-          var advance = action.animationLock;
+          // FIXME: when endWhenNoActions is false either everything breaks or it skips any autos that happen between actions ending and simulation ending
+          var advance = action?.animationLock ?? this.remainingTime;
+        }
+
+        if (simAutoAttacks && timeTillAuto <= advance) {
+          this.elapsed += timeTillAuto;
+          timeTillGCD -= timeTillAuto;
+          advance -= timeTillAuto;
+          // Affected by certain buffs (e.g. Riddle of Wind). Speed stat affects damage
+          timeTillAuto = actionAutoAttack.baseRecastTime;
+          this.handleAction(actionAutoAttack);
         }
 
         timeTillGCD -= advance;
+        timeTillAuto -= simAutoAttacks ? advance : 0;
         this.elapsed += advance;
       }
 
