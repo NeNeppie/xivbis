@@ -2,13 +2,9 @@
  * Job Gauge object. Contains data on a certain Job resource.
  */
 class Gauge {
-  #maxCount;
-  #initCount;
-  #count;
-  #maxTime;
-  #initTime;
-  #time;
   #parent;
+  #count;
+  #time;
 
   /**
    * @param {object} thisArg Owner of the Gauge object
@@ -21,14 +17,26 @@ class Gauge {
     this.name = name;
     this.#parent = thisArg;
 
-    // Stacks-based gauges tend to count up
-    this.#maxCount = spec.maxCount ?? Infinity;
-    this.#initCount = spec.initCount ?? 0;
-    this.#count = spec.initCount ?? 0;
+    Object.defineProperties(this, {
+      maxCount: {
+        value: spec.maxCount ?? Infinity,
+        writable: false,
+      },
+      initCount: {
+        value: spec.initCount ?? 0,
+        writable: false,
+      },
+      maxTime: {
+        value: spec.maxTime ?? Infinity, // lasts forever?
+        writable: false,
+      },
+      initTime: {
+        value: spec.initTime ?? 0,
+        writable: false,
+      },
+    });
 
-    // Time-based gauges tend to count down
-    this.#maxTime = spec.maxTime ?? Infinity; // lasts forever?
-    this.#initTime = spec.initTime ?? 0;
+    this.#count = spec.initCount ?? 0;
     // TEMP: Bad design. I don't want to be spammed by records when the elapsed time advances
     //  but #time must be constantly modified for any checks against it to work
     this.#time = spec.initTime ?? 0;
@@ -37,45 +45,31 @@ class Gauge {
   get count() {
     return this.#count;
   }
-  set count(value) {
+
+  setCount(currTime, value) {
     if (this.#count !== undefined && value !== this.#count) {
-      const clamped = Math.max(Math.min(value, this.#maxCount), 0);
-      this.#parent.addRecord(this, { count: clamped });
+      const clamped = Math.max(Math.min(value, this.maxCount), 0);
+      this.#parent.addRecord(currTime, this, { count: clamped });
       this.#count = clamped;
     }
-  }
-
-  get maxCount() {
-    return this.#maxCount;
-  }
-
-  get initCount() {
-    return this.#initCount;
   }
 
   get time() {
     return this.#time;
   }
-  set time(value) {
-    if (this.#time !== undefined && value !== this.#time) {
-      const clamped = Math.max(Math.min(value, this.#maxTime), 0);
-      this.#parent.addRecord(this, { time: clamped });
+
+  setTime(currTime, value) {
+    if (this.#time !== undefined && value !== this.#time && !isNaN(value)) {
+      const clamped = Math.max(Math.min(value, this.maxTime), 0);
+      this.#parent.addRecord(currTime, this, { time: clamped });
       this.#time = clamped;
     }
   }
 
-  get maxTime() {
-    return this.#maxTime;
-  }
-
-  get initTime() {
-    return this.#initTime;
-  }
-
-  reset() {
-    this.#parent.addRecord(this, { count: this.#initCount, time: this.#initTime });
-    this.count = this.#initCount;
-    this.time = this.#initTime;
+  reset(currTime) {
+    this.#parent.addRecord(currTime, this, { count: this.initCount, time: this.initTime });
+    this.#count = this.initCount;
+    this.#time = this.initTime;
   }
 }
 
@@ -87,8 +81,8 @@ export class SimulationGaugeRecorder {
   // Indicates `finalize()` has been called
   #finalized;
 
-  constructor(simTimeElapsed) {
-    this.initialize(simTimeElapsed);
+  constructor() {
+    this.initialize();
   }
 
   get gauges() {
@@ -96,10 +90,10 @@ export class SimulationGaugeRecorder {
   }
 
   /** Will NOT clear gauge elements stored */
-  initialize(simTimeElapsed) {
+  initialize() {
+    this.#gauges.forEach((gauge) => gauge.reset(0));
     this.#records = [];
     this.#finalized = false;
-    this.elapsed = simTimeElapsed; // DEBUG: Check if local elapsed changes with simulator's elapsed
   }
 
   createGauge(name, gaugeSpec) {
@@ -113,9 +107,9 @@ export class SimulationGaugeRecorder {
     return this.gauges.find((gauge) => gauge.name === name);
   }
 
-  addRecord(gauge, newValues) {
+  addRecord(currTime, gauge, newValues) {
     const record = {
-      elapsed: this.elapsed, // DEBUG: Check if local elapsed changes with simulator's elapsed
+      elapsed: currTime,
       name: gauge.name,
       count: gauge.count,
       time: gauge.time,

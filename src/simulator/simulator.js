@@ -5,6 +5,7 @@ import { SimulationGaugeRecorder } from "./gauge-recorder.js";
 const DOT_TICKRATE = 3;
 // const TIME_ADVANCEMENT_PING_DELAY = 0.02;
 
+// Refactor NOTE: Change in favor of a class similar to GaugeRecorder?
 export class ArrayEx extends Array {
   /** @alias push */
   append(value) {
@@ -45,13 +46,13 @@ export class StandardSimulation {
 
   constructor(gearset) {
     this.gearset = gearset;
-    this.gauge = new SimulationGaugeRecorder(this.#elapsedTime);
+    this.gauge = new SimulationGaugeRecorder();
     this.reset();
   }
 
   /** Does not reset overwritten stats */
   reset() {
-    this.gauge.initialize();
+    this.gauge.initialize(); // Called twice on creation. not an issue
     this.#cooldowns.clear();
     this.#effects = new ArrayEx();
     this.#dots = [];
@@ -386,15 +387,11 @@ export class StandardSimulation {
       // if ((dot.requireCombo && comboValid) || !dot.requireCombo)
       const gauge = this.gauge.get(info.name);
 
-      // Redundant if
-      if (info.changeCount !== 0) {
-        gauge.count += info.changeCount;
-      }
-      if (!isNaN(info.setTime)) {
-        gauge.time = info.setTime;
-      }
+      gauge.setCount(this.elapsed, gauge.count + info.changeCount);
+      gauge.setTime(this.elapsed, info.setTime);
+
       if (info.shouldResetGauge) {
-        gauge.reset();
+        gauge.reset(this.elapsed);
       }
     });
 
