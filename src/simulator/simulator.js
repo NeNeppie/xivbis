@@ -47,6 +47,16 @@ export class StandardSimulation {
   constructor(gearset) {
     this.gearset = gearset;
     this.gauge = new SimulationGaugeRecorder();
+
+    this.actionAutoAttack = {
+      name: "Auto Attack",
+      type: "auto",
+      potency: this.gearset.job.autoPotency,
+      isGCD: false,
+      damageType: "physical",
+      baseRecastTime: this.stats.delay,
+    };
+
     this.reset();
   }
 
@@ -61,6 +71,8 @@ export class StandardSimulation {
 
     this.fightDuration = 0;
     this.startingPoint = 0;
+    this.timeTillGCD = 0;
+    this.timeTillAuto = 0;
     this.lastGCD = null;
     this.events = [];
   }
@@ -102,6 +114,9 @@ export class StandardSimulation {
   }
 
   get stats() {
+    // TODO: Cache gearset.stats since this getter is rather expensive.
+    //        OR
+    //       Change the getter's implementation to return an already-cached value that is updated whenever a gearpiece is.
     return this.#statsOverwrite ? this.#statsOverwrite : this.gearset.stats;
   }
   set stats(newStats) {
@@ -165,7 +180,7 @@ export class StandardSimulation {
     const activeBuffs = this.#effects.getActive(this.elapsed).filter((buff) => {
       const usedOn = buff.usedOn?.(action);
       if (usedOn === true) {
-        buff.onUse?.(action);
+        buff.onUse?.(action); // NOTE: Shouldn't really be in this function
         return true;
       } else if (usedOn === undefined) {
         return true;
@@ -402,6 +417,80 @@ export class StandardSimulation {
     return true;
   }
 
+  advanceBy(time, shouldAdvanceAuto) {
+    // check if we're intersecting an auto attack use.
+    // If so, advance to it, handle it, then subtract from the total time we're advancing by
+    if (shouldAdvanceAuto) {
+      if (this.timeTillAuto <= time) {
+        this.elapsed += this.timeTillAuto;
+        this.timeTillGCD -= this.timeTillAuto;
+        time -= this.timeTillAuto;
+
+        this.handleAction(this.actionAutoAttack);
+
+        // TODO: Affected by certain buffs (e.g. Riddle of Wind). Speed stat affects damage
+        this.timeTillAuto = this.actionAutoAttack.baseRecastTime;
+      }
+    }
+
+    this.timeTillGCD -= time;
+    this.timeTillAuto -= shouldAdvanceAuto ? time : 0;
+    this.elapsed += time;
+  }
+
+  simulate(actionList, duration, start = 0, endWhenNoActions = false, simAutoAttacks = true) {
+    // this.#actionList = actionList;
+
+    // Reassigning recast time in case the stats got overwritten
+    this.actionAutoAttack.baseRecastTime = this.stats.delay;
+
+    this.elapsed = start;
+    this.fightDuration = duration;
+    this.startingPoint = start;
+    this.timeTillGCD = 0;
+    this.timeTillAuto = 0;
+
+    let index = 0;
+    let timeCommited = 0;
+    let lastActionSuccess = true;
+
+    while (this.elapsed < this.fightDuration) {
+      const action = index < actionList.length ? actionList[index] : null;
+      if (!action) {
+        if (!endWhenNoActions && simAutoAttacks && this.remainingTime > this.timeTillAuto) {
+          // rapid fire all remaining autoattacks
+          this.advanceBy(this.timeTillAuto, simAutoAttacks);
+          continue;
+        }
+        break;
+      }
+
+      if (action.isGCD && this.timeTillGCD - timeCommited > 0) {
+        // advance to GCD
+        this.advanceBy(this.timeTillGCD, simAutoAttacks);
+      } else {
+        this.advanceBy(timeCommited, simAutoAttacks);
+      }
+
+      timeCommited = 0;
+      lastActionSuccess = this.handleAction(action);
+      this.lastGCD = action.isGCD ? action : this.lastGCD;
+
+      if (lastActionSuccess) {
+        if (action.isGCD) {
+          // TODO: +- calculations based on speed stats, haste, instacasts yada yada
+          this.timeTillGCD = action.baseRecastTime;
+          timeCommited = action.baseCastTime;
+        }
+        timeCommited += action.animationLock;
+      }
+
+      index++;
+    }
+
+    this.finalize();
+  }
+
   finalize() {
     // Correcting for timeskip overshooting at the end of a simulation
     this.elapsed = Math.min(this.elapsed, this.fightDuration);
@@ -441,80 +530,5 @@ export class StandardSimulation {
     });
 
     this.gauge.finalize();
-  }
-
-  simulate(actionList, duration, start = 0, endWhenNoActions = false, simAutoAttacks = true) {
-    // this.#actionList = actionList;
-
-    if (simAutoAttacks) {
-      var actionAutoAttack = {
-        name: "Auto Attack",
-        type: "auto",
-        potency: this.gearset.job.autoPotency,
-        isGCD: false,
-        damageType: "physical",
-        baseRecastTime: this.stats.delay,
-      };
-    }
-
-    this.elapsed = start;
-    this.fightDuration = duration;
-    this.startingPoint = start;
-
-    let index = 0;
-    let timeTillGCD = 0;
-    let timeTillAuto = 0;
-    let lastActionSuccess = true;
-    while (this.elapsed < this.fightDuration) {
-      const action = index < actionList.length ? actionList[index] : null;
-      if (action === null && endWhenNoActions) {
-        break;
-      }
-
-      // snap to GCD if applicable and not clipping
-      if (action?.isGCD && lastActionSuccess && timeTillGCD > 0) {
-        if (simAutoAttacks && timeTillAuto <= timeTillGCD) {
-          this.elapsed += timeTillAuto;
-          timeTillGCD -= timeTillAuto;
-          // Affected by certain buffs (e.g. Riddle of Wind). Speed stat affects damage
-          timeTillAuto = actionAutoAttack.baseRecastTime;
-          this.handleAction(actionAutoAttack);
-        }
-
-        timeTillAuto -= simAutoAttacks ? timeTillGCD : 0;
-        this.elapsed += timeTillGCD;
-      }
-
-      lastActionSuccess = action ? this.handleAction(action) : true;
-      this.lastGCD = action?.isGCD ? action : this.lastGCD;
-
-      // Advance time elapsed
-      if (lastActionSuccess) {
-        if (action?.isGCD) {
-          timeTillGCD = action.baseRecastTime; // +- calculations based on speed stats, haste, instacasts yada yada
-          var advance = action.baseCastTime + action.animationLock;
-        } else {
-          // FIXME: when endWhenNoActions is false either everything breaks or it skips any autos that happen between actions ending and simulation ending
-          var advance = action?.animationLock ?? this.remainingTime;
-        }
-
-        if (simAutoAttacks && timeTillAuto <= advance) {
-          this.elapsed += timeTillAuto;
-          timeTillGCD -= timeTillAuto;
-          advance -= timeTillAuto;
-          // Affected by certain buffs (e.g. Riddle of Wind). Speed stat affects damage
-          timeTillAuto = actionAutoAttack.baseRecastTime;
-          this.handleAction(actionAutoAttack);
-        }
-
-        timeTillGCD -= advance;
-        timeTillAuto -= simAutoAttacks ? advance : 0;
-        this.elapsed += advance;
-      }
-
-      index++;
-    }
-
-    this.finalize();
   }
 }

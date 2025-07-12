@@ -157,7 +157,6 @@ describe("Tracker-based Simulator Testing", () => {
       Actions.Stardiver,
       Actions.DragonfireDive,
       Actions.actSpiralBlow,
-      Actions.actChaoticSpring,
     ];
 
     simulator.reset();

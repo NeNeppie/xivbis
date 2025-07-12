@@ -52,7 +52,8 @@ Implementing realistic damage calculation by simulating a damage rotation for a 
         ✅ DoTs
         ✅ Combos
         ✅ Status granters / inflicters
-        🟨 Autoattacks
+        ✅ Autoattacks
+    - Add support for prepull setup
     - Add support for potion uses
     - Add support for party buffs & bursts
     - Level backwards compatiblity
