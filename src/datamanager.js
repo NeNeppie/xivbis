@@ -4,36 +4,57 @@ const XIVAPI_URL = "https://v2.xivapi.com/api/";
 const RESULTS_PER_PAGE = 250;
 
 export default class DataManager {
-  #_itemLevel = null;
-  #_itemsGear = null;
-  // #_itemsFood = null;
-  // #_materia = null;
+  #itemsGearTask = null;
+  #itemLevelTask = null;
+
+  #itemsGear = null;
+  #itemLevel = null;
+  // #itemsFood = null;
+  // #materia = null;
 
   constructor(job) {
     this.job = job;
   }
 
   async fetchData() {
-    const itemsTask = fetchItemsGearCurrent(this.job).then((data) => {
+    this.#itemsGearTask = fetchItemsGearCurrent(this.job).then((data) => {
       console.log(`Fetched ${data.length} items.`);
-      this.#_itemsGear = data;
+      this.#itemsGear = data;
       return data;
     });
 
-    const itemLevelTask = fetchItemLevel().then((data) => {
-      this.#_itemLevel = data;
+    this.#itemLevelTask = fetchItemLevel().then((data) => {
+      this.#itemLevel = data;
       return data;
     });
 
-    await Promise.all([itemsTask, itemLevelTask]);
+    await Promise.all([this.#itemsGearTask, this.#itemLevelTask]);
   }
 
   get itemsGear() {
-    return this.#_itemsGear;
+    if (this.#itemsGearTask !== null) {
+      return this.#itemsGearTask.then(this.#itemsGear);
+    }
+    console.warn(`Attempted to get data ItemsGear before fetching it from xivapi`);
+    console.trace();
+    return [];
+  }
+
+  get itemsFood() {
+    return new EvalError("Not implemented."); //TEMP:
+  }
+
+  get materia() {
+    return new EvalError("Not implemented."); //TEMP:
   }
 
   get itemLevel() {
-    return this.#_itemLevel;
+    if (this.#itemLevelTask !== null) {
+      return this.#itemLevelTask.then(this.#itemLevel);
+    }
+    console.warn(`Attempted to get data ItemLevel before fetching it from xivapi`);
+    console.trace();
+    return {};
   }
 }
 
@@ -42,15 +63,19 @@ async function xivapiFetch(url, tries = 5) {
   while (true) {
     tries--;
 
-    const res = await fetch(url);
+    try {
+      var res = await fetch(url);
+    } catch (error) {
+      return Promise.reject(error);
+    }
+
     if (res.status === 429 && tries > 0) {
       console.log(`Too Many Requests. Retrying...`);
       await new Promise((r) => setTimeout(r, 1000 + Math.random * 500));
       continue;
     } else if (!res.ok || tries <= 0) {
       const resJSON = JSON.stringify(await res.json());
-      console.error(`Xivapi fetch error '${res.status}': ${res.statusText}`, resJSON);
-      throw Error(`Xivapi fetch error '${res.status}': ${res.statusText} - ${resJSON}`);
+      return Promise.reject(Error(`Xivapi fetch error '${res.status}': ${res.statusText} - ${resJSON}`));
     }
     return res;
   }
@@ -65,11 +90,22 @@ async function xivapiFetchList(params) {
   let data = [];
 
   while (remainingPages-- > 0) {
-    const response = await xivapiFetch(url + `&after=${nextRow}`).then((res) => res.json());
-    const responseData = response.rows;
+    const result = await xivapiFetch(url + `&after=${nextRow}`)
+      .then((res) => res.json())
+      .then((resData) => {
+        resData = resData.rows;
+        data.push(...resData.filter((obj) => Object.keys(obj.fields).length > 0));
+        return resData;
+      })
+      .catch((reason) => {
+        console.error(reason);
+      });
 
-    data.push(...responseData.filter((obj) => Object.keys(obj.fields).length > 0));
-    if (responseData.length === 0 || responseData.length < limit) {
+    if (result === undefined) {
+      return [];
+    }
+
+    if (result.length === 0 || result.length < limit) {
       break;
     }
     nextRow += limit;
@@ -102,16 +138,23 @@ async function fetchItemsGear(params) {
   while (remainingPages-- > 0) {
     let pageQuery = "";
 
-    if (nextCursor === null) {
-      pageQuery = firstQuery;
-    } else {
-      pageQuery = url + `&cursor=${nextCursor}`;
+    pageQuery = nextCursor === null ? firstQuery : url + `&cursor=${nextCursor}`;
+
+    const response = await xivapiFetch(pageQuery)
+      .then((res) => res.json())
+      .then((resData) => {
+        data.push(...resData.results);
+        nextCursor = resData.next;
+        return resData;
+      })
+      .catch((reason) => {
+        console.error(reason);
+      });
+
+    if (response === undefined) {
+      return [];
     }
 
-    const response = await xivapiFetch(pageQuery).then((res) => res.json());
-    const results = response.results;
-    data.push(...results);
-    nextCursor = response.next;
     if (nextCursor === undefined) {
       break;
     }

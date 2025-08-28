@@ -2,6 +2,9 @@ import { convertParamToAbbr, convertParamToAbbrSingle } from "../gearset.js";
 import { sumObjectsByKey } from "../utils/math-utils.js";
 import { createElementEx } from "./ui-core.js";
 
+const MESSAGE_LOADING = "Loading...";
+const MESSAGE_LOAD_ERROR = "Error loading content.";
+
 export class GearTableContainer {
   gearTables = [];
 
@@ -34,10 +37,9 @@ export class GearTableContainer {
     div.appendChild(table);
   }
 
-  #populateTables(job) {
-    for (const item of this.dataManager.itemsGear
-      .filter((item) => item.gearJob.includes(job))
-      .sort((a, b) => a.itemLevel - b.itemLevel)) {
+  async #populateTables(job) {
+    const items = await this.dataManager.itemsGear;
+    for (const item of items.filter((item) => item.gearJob.includes(job)).sort((a, b) => a.itemLevel - b.itemLevel)) {
       if (item.gearTypeID === "ring") {
         // Could alternatively push gearTables to a dictionary. this.gearTables["leftring"/"rightring"]...
         this.gearTables.find((tbl) => tbl.id === "leftring").addRow(item, this.gearset);
@@ -46,6 +48,12 @@ export class GearTableContainer {
         this.gearTables.find((tbl) => tbl.id === item.gearTypeID).addRow(item, this.gearset);
       }
     }
+
+    this.gearTables.forEach((table) => {
+      if (!table.loaded) {
+        table.displayError();
+      }
+    });
   }
 }
 
@@ -69,6 +77,7 @@ class GearTable extends HTMLTableElement {
   constructor(job) {
     super();
 
+    this.loaded = false;
     this.job = job;
     this.classList.add("tb", "gear-selects");
 
@@ -153,14 +162,33 @@ class GearTable extends HTMLTableElement {
       }
     }
 
+    const infoCell = this.insertRow(-1).insertCell();
+    infoCell.colSpan = 999;
+    infoCell.style = "text-align: center; height: 300px;";
+    infoCell.textContent = MESSAGE_LOADING;
+
     this.prepend(colgroup);
   }
 
   addRow(item, gearset) {
+    const tbody = this.tBodies[0];
+
+    if (!this.loaded) {
+      tbody.lastChild.remove();
+      this.loaded = true;
+    }
+
     const visibleHeaders = this.rows[1].cells;
 
     const row = new GearTableRow(item, gearset, visibleHeaders);
-    this.tBodies[0].appendChild(row);
+    tbody.appendChild(row);
+  }
+
+  displayError() {
+    if (!this.loaded) {
+      const infoRow = this.tBodies[0].lastChild;
+      infoRow.childNodes[0].textContent = MESSAGE_LOAD_ERROR;
+    }
   }
 }
 
