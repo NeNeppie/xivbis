@@ -1,4 +1,5 @@
 import { StandardSimulation as Simulator } from "../simulator.js";
+import * as Actions from "./drg-actions.js";
 
 export class StandardSimulationDRG extends Simulator {
   constructor(gearset) {
@@ -7,29 +8,39 @@ export class StandardSimulationDRG extends Simulator {
     this.gauge.createGauge("Firstmind's Focus", { maxCount: 2, initCount: 0 });
   }
 
-  // simulate(actionList, duration, start = 0, endWhenNoActions = false, simAutoAttacks = true) {
-  // this.test.attach("Raiden Thurst", () => {
-  //   const gauge = this.test.getGauge("Firstmind's Focus");
-  //   gauge.increment();
-  // });
+  simulate(actionsOverwrite, duration, start = 0, endWhenNoActions = false, simAutoAttacks = true) {
+    if (!actionsOverwrite || actionsOverwrite.length === 0) {
+      super.simulate(this.#actionsDefault, duration, start, endWhenNoActions, simAutoAttacks);
+    } else {
+      super.simulate(actionsOverwrite, duration, start, endWhenNoActions, simAutoAttacks);
+    }
+  }
 
-  // // Example use for action with multiple gauge changes?
-  // this.test.attach("Energy Drain", () => {
-  //   const aetherflow = this.test.getGauge("Aetherflow");
-  //   const fairy = this.test.getGauge("Fairy Gauge");
-  //   aetherflow.decrement();
-  //   fairy.update(10);
-  // });
-
-  // this.test.addTrigger("Energy Drain", "Aetherflow", (gauge) => {
-  //   gauge.decrement();
-  // });
-
-  // this.test.addTrigger("Energy Drain", "Fairy Gauge", (gauge) => {
-  //   gauge.update(10);
-  // });
-  // Example End
-
-  //   super.simulate(actionList, duration, start, endWhenNoActions, simAutoAttacks);
-  // }
+  #actionsDefault = [
+    Actions.actTrueThrust,
+    Actions.actSpiralBlow,
+    Actions.LanceCharge, // NOTE: Should be late-weaved in reopeners.
+    // Potion goes here
+    Actions.actChaoticSpring,
+    Actions.BattleLitany,
+    Actions.Geirskogul,
+    Actions.actWheelingThrust,
+    Actions.HighJump,
+    Actions.LifeSurge,
+    Actions.actDrakesbane,
+    Actions.DragonfireDive,
+    Actions.Nastrond,
+    Actions.actRaidenThrust,
+    Actions.Stardiver,
+    Actions.actLanceBarrage,
+    Actions.LifeSurge,
+    Actions.Starcross,
+    Actions.actHeavensThrust,
+    Actions.MirageDive,
+    Actions.RiseoftheDragon,
+    Actions.actFangAndClaw,
+    Actions.actDrakesbane,
+    Actions.actRaidenThrust,
+    Actions.WyrmwindThrust,
+  ];
 }

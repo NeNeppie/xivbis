@@ -3,7 +3,7 @@ import { rnd } from "../utils/math-utils.js";
 import { SimulationGaugeRecorder } from "./gauge-recorder.js";
 
 const DOT_TICKRATE = 3;
-// const TIME_ADVANCEMENT_PING_DELAY = 0.02;
+const TIME_ADVANCEMENT_PING_DELAY = 0.02;
 
 // Refactor NOTE: Change in favor of a class similar to GaugeRecorder?
 export class ArrayEx extends Array {
@@ -85,9 +85,10 @@ export class StandardSimulation {
   };
 
   /** Appends a regular damage event */
-  sendEventAction(name, data) {
+  sendEventAction(name, id, data) {
     const event = {
       ...new this.EventObjectBase(this.elapsed, "Action", name),
+      id: id,
       data: data,
     };
     this.events.push(event);
@@ -114,9 +115,6 @@ export class StandardSimulation {
   }
 
   get stats() {
-    // TODO: Cache gearset.stats since this getter is rather expensive.
-    //        OR
-    //       Change the getter's implementation to return an already-cached value that is updated whenever a gearpiece is.
     return this.#statsOverwrite ? this.#statsOverwrite : this.gearset.stats;
   }
   set stats(newStats) {
@@ -343,6 +341,7 @@ export class StandardSimulation {
     let eventInitData = {
       potency: potency,
       damage: damage,
+      isGCD: action.isGCD,
       applicationDelay: action.applicationTime,
       combo: comboValid,
       effects: activeBuffs,
@@ -373,7 +372,7 @@ export class StandardSimulation {
     });
 
     // Logs show status effects applying before, but not affecting, damage application
-    const event = this.sendEventAction(action.name, eventInitData);
+    const event = this.sendEventAction(action.name, action.id, eventInitData);
 
     // Can't remember if there are any abilities that apply multiple dots, but even if not, guess this is futureproofing?
     action.dotInfo?.forEach((dot) => {
@@ -482,7 +481,7 @@ export class StandardSimulation {
           this.timeTillGCD = action.baseRecastTime;
           timeCommited = action.baseCastTime;
         }
-        timeCommited += action.animationLock;
+        timeCommited += action.animationLock + TIME_ADVANCEMENT_PING_DELAY;
       }
 
       index++;

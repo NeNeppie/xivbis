@@ -143,6 +143,7 @@ export function calculateBaseDamage(level, job, stats, potency, actionType, isAu
   // NOTE: BLU has an action that uses the non-caster formula despite being a caster job
   if ((jobs[job].role === "caster" || jobs[job].role === "healer") && !isAuto) {
     var damage = 0;
+    console.warn("Implement Caster Formula!!");
     // TODO: Caster formula for magical jobs.
     // Damage type actually has nothing to do with the damage formula; it only affects the speed stat used in calculations
   } else {
@@ -160,25 +161,25 @@ export function calculateBaseDamage(level, job, stats, potency, actionType, isAu
   }
 
   //damage *= (getRandomInt(95, 105) / 100);
-  damage += damage * buffs.damage;
+  damage += damage * (buffs.damage ?? 0);
   return flr(damage, 2);
 }
 
-function applyAutoCrit(level, statCrit, damage, bonusCritRate) {
+function applyAutoCrit(level, statCrit, damage, bonusCritRate = 0) {
   const multiplierCrit = getCritMultiplier(level, statCrit);
   const criticalHitBonus = 1 + bonusCritRate * (multiplierCrit - 1);
 
   return flr(damage * multiplierCrit * criticalHitBonus, 2);
 }
 
-function multAutoCrit(level, statCrit, bonusCritRate) {
+function multAutoCrit(level, statCrit, bonusCritRate = 0) {
   const multiplierCrit = getCritMultiplier(level, statCrit);
   const criticalHitBonus = 1 + bonusCritRate * (multiplierCrit - 1);
 
   return multiplierCrit * criticalHitBonus;
 }
 
-function applyCritHit(level, statCrit, damage, bonusCritRate) {
+function applyCritHit(level, statCrit, damage, bonusCritRate = 0) {
   const multiplierCrit = getCritMultiplier(level, statCrit);
   const probabilityCrit = getCritHitRate(level, statCrit) / 100;
 
@@ -186,33 +187,33 @@ function applyCritHit(level, statCrit, damage, bonusCritRate) {
   return flr(damage * criticalHit, 2);
 }
 
-function multCritHit(level, statCrit, bonusCritRate) {
+function multCritHit(level, statCrit, bonusCritRate = 0) {
   const multiplierCrit = getCritMultiplier(level, statCrit);
   const probabilityCrit = getCritHitRate(level, statCrit) / 100;
 
   return 1 + (probabilityCrit + bonusCritRate) * (multiplierCrit - 1);
 }
 
-function applyAutoDirect(damage, bonusDirectRate) {
+function applyAutoDirect(damage, bonusDirectRate = 0) {
   const directHitBonus = 1 + bonusDirectRate * 0.25;
 
   return flr(damage * 1.25 * directHitBonus, 2);
 }
 
-function multAutoDirect(bonusDirectRate) {
+function multAutoDirect(bonusDirectRate = 0) {
   const directHitBonus = 1 + bonusDirectRate * 0.25;
 
   return 1.25 * directHitBonus;
 }
 
-function applyDirectHit(level, statDH, damage, bonusDirectRate) {
+function applyDirectHit(level, statDH, damage, bonusDirectRate = 0) {
   const probabilityDirect = getDirectHitRate(level, statDH) / 100;
 
   const directHit = 1 + (probabilityDirect + bonusDirectRate) * 0.25;
   return flr(damage * directHit, 2);
 }
 
-function multDirectHit(level, statDH, bonusDirectRate) {
+function multDirectHit(level, statDH, bonusDirectRate = 0) {
   const probabilityDirect = getDirectHitRate(level, statDH) / 100;
 
   return 1 + (probabilityDirect + bonusDirectRate) * 0.25;
@@ -237,13 +238,6 @@ export function applyCritDh(level, baseDamage, stats, buffCrit = 0, buffDirect =
 export function calculateDamage(level, job, stats, potency, dmgType, isAuto = false, isDot = false, buffs = {}) {
   const baseDamage = calculateBaseDamage(level, job, stats, potency, dmgType, isAuto, isDot, buffs);
 
-  // const critStep = buffs.autocrit
-  //   ? applyAutoCrit(level, stats.crit, baseDamage, buffs.crit)
-  //   : applyCritHit(level, stats.crit, baseDamage, buffs.crit);
-  // const completeDamage = buffs.autodirect
-  //   ? applyAutoDirect(damageCrit, buffs.direct)
-  //   : applyDirectHit(level, stats.directHit, damageCrit, buffs.direct);
-
   const multiplierCritDamage = buffs.autocrit
     ? multAutoCrit(level, stats.crit, buffs.crit)
     : multCritHit(level, stats.crit, buffs.crit);
@@ -252,6 +246,6 @@ export function calculateDamage(level, job, stats, potency, dmgType, isAuto = fa
     : multDirectHit(level, stats.directHit, buffs.direct);
   const expectedDamage = flr(baseDamage * multiplierCritDamage * multiplierDhDamage, 2);
 
-  // Maybe do away with base and expected damage. `base` no longer provides meaningful information
+  // Refactor NOTE: rename 'base' to 'raw'
   return { base: baseDamage, expected: expectedDamage };
 }

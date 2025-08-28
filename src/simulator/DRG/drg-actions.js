@@ -109,6 +109,31 @@ export const Starcross = ActionBuilder.CreateBaseOGCD("Starcross", 1000)
     return ctx.getActiveStatus("Life of the Dragon") && ctx.getActiveStatus("Starcross Ready");
   });
 
+// prettier-ignore
+{
+  actTrueThrust.id      = 310;
+  actSpiralBlow.id      = 2077;
+  actLanceBarrage.id    = 2076;
+  actChaoticSpring.id   = 2596;
+  actHeavensThrust.id   = 2595;
+  actWheelingThrust.id  = 2584;
+  actFangAndClaw.id     = 2582;
+  actDrakesbane.id      = 2599;
+  actRaidenThrust.id    = 2592;
+  LifeSurge.id          = 304;
+  LanceCharge.id        = 309;
+  HighJump.id           = 2591;
+  DragonfireDive.id     = 2578;
+  BattleLitany.id       = 2585;
+  Geirskogul.id         = 2583;
+  MirageDive.id         = 2588;
+  Nastrond.id           = 2589;
+  Stardiver.id          = 2593;
+  WyrmwindThrust.id     = 2597;
+  RiseoftheDragon.id    = 2075;
+  Starcross.id          = 2078;
+}
+
 // FIXME: Lock cast and recast time for gcds and ogcds that are not affected by Speed
 //        Come to think of it what *about* Speeds? I did not take them into account at all thus far.
 //        Flag for combos that can and cannot be interrupted and stopped by another combo. E.g. GNB Gnashing Fang
