@@ -1,9 +1,18 @@
+:root {
+  --global-border-radius: 0.625rem;
+  --global-border-color: #6b604a;
+  background: hsl(50, 5%, 7%);
+}
+
 body {
   font-family: monospace;
   background-attachment: fixed;
-  background: hsl(50, 10%, 12%);
   background: linear-gradient(to bottom, hsl(50, 5%, 7%) 90%, #6e5b17);
   color: aliceblue;
+}
+
+h1 {
+  color: #ffd700;
 }
 
 label {
@@ -18,25 +27,60 @@ th {
 }
 
 td {
+  text-align: left;
+  vertical-align: middle;
+
   img {
     height: 1.5rem;
     vertical-align: middle; /* Should just be set globally */
   }
-  text-align: left;
-  vertical-align: middle;
+}
+
+dialog[data-modal] {
+  background-color: hsl(50, 3%, 9%);
+  border-color: var(--global-border-color);
+  border-radius: var(--global-border-radius);
+  color: aliceblue;
+  padding: 10px 10px 10px 20px;
+  width: 75vw;
+  height: 50vh;
+  overflow: hidden;
+
+  &::backdrop {
+    background-color: hsla(0, 0%, 0%, 0.4);
+  }
+}
+
+button.popup-close {
+  float: right;
+  color: aliceblue;
+  background: none;
+  border: 2px solid var(--global-border-color);
+  border-radius: 0.25rem;
+  padding: 5px 8px;
+
+  &:hover {
+    background-color: #ffffff50;
+    border-color: #ffffff80;
+  }
+}
+
+.align-right {
+  float: right;
+  margin-right: 5%;
 }
 
 .gear-pairs {
+  display: flex;
   text-align: center;
   justify-content: center;
   position: relative;
-  display: flex;
   flex-wrap: wrap;
 }
 
 .gear-group {
-  justify-content: center;
   display: flex;
+  justify-content: center;
   flex-wrap: wrap;
 }
 
@@ -70,6 +114,73 @@ td {
   background-color: #ffcf0030;
 }
 
+.timeline {
+  --ruler-tick-width: 1.75em;
+  --default-padding-left: calc(100% / 10 - var(--ruler-tick-width));
+
+  height: 75%;
+  padding: 10px 20px;
+
+  .skillboard {
+    background-size: calc(var(--ruler-tick-width) + var(--default-padding-left));
+    background-image: linear-gradient(to right, grey 1px, transparent 1px),
+      linear-gradient(rgba(65, 105, 225, 0.5) 25%, transparent);
+    border: 2px solid var(--global-border-color);
+    height: 75%;
+    width: 100%;
+
+    overflow-x: scroll;
+    white-space: nowrap;
+    scrollbar-width: none;
+
+    img {
+      max-width: 40px;
+      max-height: 40px;
+      position: absolute;
+      border-radius: 5px;
+      filter: drop-shadow(0 0 2px black);
+    }
+  }
+
+  .ruler {
+    list-style: none;
+    display: inline-block;
+    height: 2rem;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+    background-color: aliceblue;
+    color: black;
+    border: 2px solid var(--global-border-color);
+
+    white-space: nowrap;
+    overflow-x: scroll;
+    scrollbar-width: none;
+
+    li {
+      display: inline-block;
+      padding-left: var(--default-padding-left);
+      margin-top: 1em;
+      min-width: 1.75em;
+      text-align: center;
+      position: relative;
+
+      &:before {
+        content: "";
+        border-left: 1px solid black;
+        position: absolute;
+        height: 1em;
+        top: -1em;
+        right: 0.75em;
+      }
+
+      &:first-of-type {
+        margin-left: calc(var(--ruler-tick-width) / 2);
+      }
+    }
+  }
+}
+
 table.tb {
   --inner-border-width: 0.0625rem;
   --cell-padding: 5px;
@@ -78,8 +189,8 @@ table.tb {
   table-layout: fixed;
   background-color: #1e1e1e;
   border-collapse: separate;
-  border-color: #6b604a;
-  border-radius: 0.625rem;
+  border-color: var(--global-border-color);
+  border-radius: var(--global-border-radius);
   border-spacing: 0;
   border-style: solid;
   border-width: 0.125rem;
@@ -114,14 +225,14 @@ table.tb {
 
     td:first-child {
       border-left-style: solid;
-      border-top-left-radius: 0.625rem;
-      border-bottom-left-radius: 0.625rem;
+      border-top-left-radius: var(--global-border-radius);
+      border-bottom-left-radius: var(--global-border-radius);
       padding-left: var(--selected-cell-padding);
     }
     td:last-child {
       border-right-style: solid;
-      border-top-right-radius: 0.625rem;
-      border-bottom-right-radius: 0.625rem;
+      border-top-right-radius: var(--global-border-radius);
+      border-bottom-right-radius: var(--global-border-radius);
       padding-right: var(--selected-cell-padding);
     }
   }
@@ -129,8 +240,4 @@ table.tb {
   tr:not(:nth-child(1), :nth-child(2)):hover {
     background: #ffd70033;
   }
-}
-
-h1 {
-  color: #ffd700;
 }

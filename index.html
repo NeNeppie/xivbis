@@ -7,8 +7,17 @@
     <link rel="stylesheet" href="styles/style.css" />
   </head>
   <body>
-    <h1>X<i>i</i>V-B<i>i</i>S<sub>.dev v0.0.1</sub></h1>
+    <h1>X<i>i</i>V-B<i>i</i>S<sub>.dev v0.0.2</sub></h1>
     <h2>Gear Stat Testing</h2>
+
+    <dialog data-modal="sim">
+      <button id="sim-modal-hide" class="popup-close">X</button>
+      <div class="simulation">
+        <p>Simulation Window</p>
+        <p>Hello World!</p>
+      </div>
+    </dialog>
+    <button id="sim-modal-show" class="align-right">Simulation Window</button>
 
     <label for="config-level">Level Sync: </label>
     <input required type="number" id="config-level" name="level" min="50" max="100" step="10" value="100" />

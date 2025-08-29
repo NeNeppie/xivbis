@@ -1,5 +1,6 @@
 import { jobs } from "./constants/job-consts.js";
-import { calculateBaseDamage, getBaseStats } from "./math-ffxiv.js";
+import { calculateDamage, getBaseStats } from "./math-ffxiv.js";
+import { constructJobSpecificSimulator } from "./simulator/simulator-constructor.js";
 import { sumObjectsByKey } from "./utils/math-utils.js";
 
 export const GearpieceStatDistribution = {
@@ -75,6 +76,8 @@ export function convertStatKeys(stats, statsHQ) {
 }
 
 export class Gearset {
+  #statsCached = undefined;
+
   /** @param {number} level @param {string} jobCode */
   constructor(level, jobCode) {
     this.slots = {}; // a really odd solution for infinite recursion
@@ -90,14 +93,46 @@ export class Gearset {
           },
           set: function (value) {
             this.slots[property] = value;
-            this.renderExampleDamage();
+            this.#refresh();
           },
         });
       }
     );
+
+    this.simulations = [
+      {
+        name: "100p",
+        simulation: () => {
+          // NOTE: Some jobs prefer Magical damage for their benchmarks
+          return calculateDamage(this.level, this.jobCode, this.stats, 100, "physical");
+        },
+        run: function () {
+          this.data = this.simulation();
+        },
+        data: null,
+      },
+      // TODO: Ability to add/remove simulator instances and modify them
+      {
+        name: "standard",
+        simulator: constructJobSpecificSimulator(this, this.jobCode),
+        run: function () {
+          this.simulator.reset();
+          this.simulator.simulate([], 60, 0, true, true);
+          this.data = this.simulator.events;
+        },
+        data: null,
+      },
+    ];
   }
 
   get stats() {
+    if (!this.#statsCached) {
+      this.#statsCached = convertStatKeys(this.#computeStats());
+    }
+    return this.#statsCached;
+  }
+
+  #computeStats() {
     let stats = {};
     let slots = Object.getOwnPropertyNames(this).filter((prop) => {
       return !(prop === "slots" || prop === "level" || prop === "job" || prop === "tribe");
@@ -107,26 +142,17 @@ export class Gearset {
       if (item == null) {
         continue;
       }
+      // If an item has HQ stats, they're combined as well.
       stats = sumObjectsByKey(stats, item.stats, item.statsHQ);
     }
     return sumObjectsByKey(stats, getBaseStats(this.level, this.jobCode, this.tribe ?? "default"));
   }
 
-  renderExampleDamage() {
-    const elemStats = document.getElementById("item-stats");
-    const elemDamage = document.getElementById("item-dmg");
-    const configLevel = document.getElementById("config-level").value;
-
-    const stats = this.stats;
-    elemStats.innerHTML = "";
-    for (const [key, value] of Object.entries(stats)) {
-      elemStats.innerHTML += `    ${key}: ${value}<br/>`;
+  #refresh() {
+    this.#statsCached = convertStatKeys(this.#computeStats());
+    for (const sim of this.simulations) {
+      sim.run();
     }
-
-    if (configLevel !== this.level) {
-      this.level = configLevel;
-    }
-    elemDamage.innerHTML = `${calculateBaseDamage(this.level, this.jobCode, convertStatKeys(stats), 100)}`;
   }
 }
 
@@ -153,10 +179,10 @@ export class GearItem {
     this.gearTypeID = GearpieceStatDistribution[equipmentID].id;
     this.gearJob = item.ClassJobCategory.fields.Name.split(" ");
 
-    ({ stats: this.stats, statsHQ: this.statsHQ } = GearItem.#assignStats(item));
+    ({ stats: this.stats, statsHQ: this.statsHQ } = GearItem.#extractStats(item));
   }
 
-  static #assignStats(item) {
+  static #extractStats(item) {
     let stats = {};
     let statsHQ = {};
     for (let i = 0; i < 5; i++) {
