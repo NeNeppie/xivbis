@@ -1,5 +1,6 @@
 import { Gearset } from "../../gearset.js";
 import { createElementEx, getIconUrl } from "../ui-core.js";
+import StatusColors from "./effect-frontend-colors.json" with { type: "json" };
 
 export default class TimelineElement extends HTMLDivElement {
   #gearset;
@@ -70,41 +71,68 @@ export default class TimelineElement extends HTMLDivElement {
 
     this.divTimeRuler.setAttribute("data-count", simulation.simulator.elapsed);
     const records = simulation.data;
+    //console.table(records);
 
     const rulerTick = this.divTimeRuler.firstChild;
-    const topOffset = this.divSkillBoard.clientHeight * 0.5;
+    const topOffset = this.iconWidth * 2;
 
-    let index = 0;
     for (const record of records) {
       // TEMP: Till I figure out how to weave in status procs and whatnot
-      if (record.type !== "Action") {
+      if (record.type === "Action" && record.name !== "Auto Attack") {
+        var eventDiv = this.createEventAction(record, rulerTick);
+      } else if (record.type === "Status Effect" && record.data.type === "buff") {
+        var eventDiv = this.createEventBuff(record, rulerTick);
+      } else {
         continue;
       }
 
-      const posX = record.elapsed * rulerTick.clientWidth;
-      const posY = (record.data.isGCD ? 0 : this.iconWidth * 1.5) + (topOffset - this.iconWidth);
-
-      let tooltipText = `${record.name}\nUsed at: ${record.elapsed}s`;
-      if (record.data.potency !== 0) {
-        tooltipText += `\nPotency: ${record.data.potency}`;
-      }
-
-      if (record.name !== "Auto Attack") {
-        const imgSrc = getIconUrl(record.id);
-
-        const div = createElementEx("div", {
-          "data-timestamp": record.elapsed,
-          style: `max-width: 40px; max-height: 40px; display: inline-block;
-          transform: translate(${posX}px, ${posY}px)`,
-        });
-
-        const img = createElementEx("img", { src: imgSrc, title: tooltipText });
-        div.appendChild(img);
-        this.divSkillBoard.appendChild(div);
-
-        index++;
-      }
+      this.divSkillBoard.appendChild(eventDiv);
     }
+  }
+
+  createEventAction(record, rulerTick) {
+    const posX = record.elapsed * rulerTick.clientWidth;
+    const posY = (record.data.isGCD ? 1 : 2) * this.iconWidth;
+
+    let tooltipText = `${record.name}\nUsed at: ${record.elapsed}s`;
+    if (record.data.potency !== 0) {
+      tooltipText += `\nPotency: ${record.data.potency}`;
+    }
+
+    const imgSrc = getIconUrl(record.id);
+
+    const div = createElementEx("div", {
+      "data-timestamp": record.elapsed,
+      class: "timeline-event",
+      style: `transform: translate(${posX}px, ${posY}px)`,
+    });
+
+    const img = createElementEx("img", { src: imgSrc, title: tooltipText });
+    div.appendChild(img);
+    return div;
+  }
+
+  createEventBuff(record, rulerTick) {
+    const posX = record.elapsed * rulerTick.clientWidth;
+    // TODO: Account for overlapping buffs
+    const posY = this.iconWidth * 3;
+
+    let tooltipText = `${record.name}\nUsed at: ${record.elapsed}s\nDuration: ${record.data.duration}s\n${record.data.description}`;
+    const imgSrc = getIconUrl(record.id);
+
+    const div = createElementEx("div", {
+      "data-timestamp": record.elapsed,
+      "data-duration": record.data.duration,
+      class: "timeline-event timeline-event-buff",
+      style: `--data-color: ${StatusColors[record.name] ?? ""}; --data-width: ${
+        /* TODO: Past sins come back to bite me as correct durations are saved on action events that own the buff and not on buff events */
+        record.data.duration * rulerTick.clientWidth
+      }px; transform: translate(${posX}px, ${posY}px);`,
+    });
+
+    const img = createElementEx("img", { src: imgSrc, title: tooltipText });
+    div.appendChild(img);
+    return div;
   }
 
   redrawSkillboard() {
@@ -116,8 +144,12 @@ export default class TimelineElement extends HTMLDivElement {
       const posX = child.getAttribute("data-timestamp") * rulerTick.clientWidth;
       const posY = transform.m42;
 
-      // FIXME: Strange grid snapping with causes unalignment with the ruler
+      // FIXME: Strange grid snapping causes unalignment with the ruler
       child.style.transform = `translate(${posX}px, ${posY}px)`;
+      if (getComputedStyle(child).getPropertyValue("--data-width") !== "") {
+        const newWidth = child.getAttribute("data-duration") * rulerTick.clientWidth;
+        child.style.setProperty("--data-width", `${newWidth}px`);
+      }
     }
   }
 }

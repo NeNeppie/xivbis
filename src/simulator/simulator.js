@@ -96,9 +96,10 @@ export class StandardSimulation {
   }
 
   /** Appends an event with a state */
-  sendEventState(type, name, state, data) {
+  sendEventState(type, name, id, state, data) {
     const event = {
       ...new this.EventObjectBase(this.elapsed, type, name),
+      id: id,
       state: state,
       data: data,
     };
@@ -367,7 +368,7 @@ export class StandardSimulation {
         // }
 
         eventInitData.appliedEffect.push({ ...this.recordStatus(status, status.duration), refreshed: refresh });
-        this.sendEventState("Status Effect", status.name, refresh ? "Reapplied" : "Applied", status);
+        this.sendEventState("Status Effect", status.name, status.id, refresh ? "Reapplied" : "Applied", status);
       }
     });
 
@@ -392,7 +393,7 @@ export class StandardSimulation {
         // Refactor NOTE: I dislike how status effects append to eventInitData while dots append to the registered event.
         //  It's done this way to keep the correct order of events (status -> action -> dot)
         //  But these events aren't truly needed when #dots and #effects record all instances of their respective types, and their mutations.
-        this.sendEventState("Damage over Time", dot.name, dotFound ? "Reapplied" : "Applied", dot);
+        this.sendEventState("Damage over Time", dot.name, 0, dotFound ? "Reapplied" : "Applied", dot);
       }
     });
 

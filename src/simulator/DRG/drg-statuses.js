@@ -1,6 +1,7 @@
 // Example for "dmg up" buff. (x * amount) + amount
 export const PowerSurge = {
   name: "Power Surge",
+  id: 210303,
   type: "buff",
   description: "Increases Damage dealt by 10%",
   effect: { damage: 0.1 },
@@ -10,6 +11,7 @@ export const PowerSurge = {
 
 export const LanceCharge = {
   name: "Lance Charge",
+  id: 210304,
   type: "buff",
   description: "Increases Damage dealt by 10%",
   effect: { damage: 0.1 },
@@ -21,6 +23,7 @@ export const LanceCharge = {
 //       At low levels this buff is "Blood of the Dragon", granting the same(?) damage bonus without the additional effects
 export const LifeDragon = {
   name: "Life of the Dragon",
+  id: 214935,
   type: "buff",
   description: "Increases Damage dealt by 15%",
   effect: { damage: 0.15 },
@@ -31,6 +34,7 @@ export const LifeDragon = {
 // Example for "crit rate up" buff. (x * amount) + amount
 export const BattleLitany = {
   name: "Battle Litany",
+  id: 212578,
   type: "buff",
   description: "Increases Critical Hit Rate by 10%",
   effect: { crit: 0.1 },
@@ -41,8 +45,9 @@ export const BattleLitany = {
 // Example for "auto crit" buff. MCH and WAR have "auto direct crit", need to futureproof that.
 export const LifeSurge = {
   name: "Life Surge",
+  id: 210302,
   type: "buff",
-  description: "Guarantees a Critical hit on following Weaponskill",
+  description: "Guarantees a Critical Hit on following Weaponskill",
   effect: { autocrit: true },
   duration: 5,
   stacks: 1,

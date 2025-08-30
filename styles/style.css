@@ -132,6 +132,11 @@ button.popup-close {
     overflow-x: scroll;
     white-space: nowrap;
     scrollbar-width: none;
+  }
+
+  .timeline-event {
+    display: inline-block;
+    vertical-align: top;
 
     img {
       max-width: 40px;
@@ -139,6 +144,28 @@ button.popup-close {
       position: absolute;
       border-radius: 5px;
       filter: drop-shadow(0 0 2px black);
+    }
+  }
+
+  .timeline-event-buff {
+    vertical-align: middle;
+
+    &:before {
+      content: "";
+      position: absolute;
+      border: 2px solid var(--data-color, #ffffff);
+      border-top: none;
+      left: 40px;
+      height: 25px;
+      width: var(--data-width);
+    }
+
+    img {
+      max-width: 20px;
+      max-height: 30px;
+      top: 10px;
+      left: 17px;
+      filter: drop-shadow(0 0 1px black);
     }
   }
 
