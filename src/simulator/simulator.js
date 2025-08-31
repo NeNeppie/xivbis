@@ -54,7 +54,7 @@ export class StandardSimulation {
       potency: this.gearset.job.autoPotency,
       isGCD: false,
       damageType: "physical",
-      baseRecastTime: this.stats.delay,
+      baseRecastTime: this.stats.delay / 1000,
     };
 
     this.reset();
@@ -441,8 +441,8 @@ export class StandardSimulation {
   simulate(actionList, duration, start = 0, endWhenNoActions = false, simAutoAttacks = true) {
     // this.#actionList = actionList;
 
-    // Reassigning recast time in case the stats got overwritten
-    this.actionAutoAttack.baseRecastTime = this.stats.delay;
+    // Reassigning recast time in case stats got overwritten
+    this.actionAutoAttack.baseRecastTime = this.stats.delay / 1000;
 
     this.elapsed = start;
     this.fightDuration = duration;

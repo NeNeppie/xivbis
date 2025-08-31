@@ -6,7 +6,7 @@ import { assert, describe, it } from "./test-framework.js";
 const debugGearset = new Gearset(100, "DRG");
 debugGearset.debugStats = {
   wdPhys: 144,
-  delay: 2.8,
+  delay: 2800,
   strength: 440 * 1.15 + 595,
   determination: 440 + 384,
   crit: 420 + 269,
