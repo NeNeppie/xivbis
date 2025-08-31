@@ -71,17 +71,27 @@ export default class TimelineElement extends HTMLDivElement {
 
     this.divTimeRuler.setAttribute("data-count", simulation.simulator.elapsed);
     const records = simulation.data;
-    //console.table(records);
+    console.table(records);
+
+    const buffElevation = {};
+    const uniqueBuffs = {};
+    for (const obj of records.filter((record) => record.type === "Status Effect" && record.data.type === "buff").reverse()) {
+      uniqueBuffs[obj.name] = obj;
+    }
+    Object.values(uniqueBuffs).forEach((br, i, arr) => {
+      buffElevation[br.name] = ((this.divSkillBoard.clientHeight - 20 - this.iconWidth * 3) / arr.length) * i; // zero-indexed, on purpose.
+    });
 
     const rulerTick = this.divTimeRuler.firstChild;
-    const topOffset = this.iconWidth * 2;
-
     for (const record of records) {
-      // TEMP: Till I figure out how to weave in status procs and whatnot
-      if (record.type === "Action" && record.name !== "Auto Attack") {
-        var eventDiv = this.createEventAction(record, rulerTick);
+      if (record.type === "Action") {
+        if (record.name === "Auto Attack") {
+          var eventDiv = this.createEventAutoAttack(record, rulerTick);
+        } else {
+          var eventDiv = this.createEventAction(record, rulerTick);
+        }
       } else if (record.type === "Status Effect" && record.data.type === "buff") {
-        var eventDiv = this.createEventBuff(record, rulerTick);
+        var eventDiv = this.createEventBuff(record, rulerTick, buffElevation[record.name]);
       } else {
         continue;
       }
@@ -112,9 +122,37 @@ export default class TimelineElement extends HTMLDivElement {
     return div;
   }
 
-  createEventBuff(record, rulerTick) {
+  createEventAutoAttack(record, rulerTick) {
     const posX = record.elapsed * rulerTick.clientWidth;
-    // TODO: Account for overlapping buffs
+    const posY = this.iconWidth * 0.4;
+
+    let tooltipText = `Auto Attack\nUsed at: ${record.elapsed}s\nPotency: ${record.data.potency}`;
+
+    const div = createElementEx("div", {
+      "data-timestamp": record.elapsed,
+      class: "timeline-event timeline-event-auto",
+      style: `transform: translate(${posX}px, ${posY}px)`,
+      title: tooltipText,
+    });
+
+    const autoAttackSVG = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    autoAttackSVG.classList.add("timeline-event-svg");
+    autoAttackSVG.setAttribute("viewBox", "0 0 40 40");
+    // autoAttackSVG.setAttribute("title", tooltipText);
+
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute(
+      "d",
+      "M 0 20 A 20 20 0 0 1 20 0 L 25 5 A 20 20 0 0 0 5 25 M 40 20 A 20 20 0 0 1 20 40 L 15 35 A 20 20 0 0 0 35 15"
+    );
+
+    autoAttackSVG.appendChild(path);
+    div.appendChild(autoAttackSVG);
+    return div;
+  }
+
+  createEventBuff(record, rulerTick, hLevel) {
+    const posX = record.elapsed * rulerTick.clientWidth;
     const posY = this.iconWidth * 3;
 
     let tooltipText = `${record.name}\nUsed at: ${record.elapsed}s\nDuration: ${record.data.duration}s\n${record.data.description}`;
@@ -127,7 +165,7 @@ export default class TimelineElement extends HTMLDivElement {
       style: `--data-color: ${StatusColors[record.name] ?? ""}; --data-width: ${
         /* TODO: Past sins come back to bite me as correct durations are saved on action events that own the buff and not on buff events */
         record.data.duration * rulerTick.clientWidth
-      }px; transform: translate(${posX}px, ${posY}px);`,
+      }px; --data-level: ${hLevel}px; transform: translate(${posX}px, ${posY}px);`,
     });
 
     const img = createElementEx("img", { src: imgSrc, title: tooltipText });
