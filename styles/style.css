@@ -147,12 +147,16 @@ button.popup-close {
     }
   }
 
-  .timeline-event-auto .timeline-event-svg {
-    width: 20px;
-    height: 20px;
-    position: absolute;
+  .timeline-event-auto {
+    &:before {
+      content: "";
+      background-image: url("../src/frontend/assets/autoattack.svg"), linear-gradient(to top, grey 50%, white);
+      aspect-ratio: 1;
+      width: 20px;
+      height: 20px;
+      position: absolute;
+    }
     filter: drop-shadow(0 0 1px white);
-    background: linear-gradient(to top, grey 50%, white);
   }
 
   .timeline-event-buff {
@@ -174,6 +178,7 @@ button.popup-close {
       max-height: 30px;
       top: calc(var(--data-level) - 5px);
       left: 17px;
+      z-index: 1;
       filter: drop-shadow(0 0 1px black);
     }
   }

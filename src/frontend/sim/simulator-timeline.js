@@ -135,19 +135,6 @@ export default class TimelineElement extends HTMLDivElement {
       title: tooltipText,
     });
 
-    const autoAttackSVG = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    autoAttackSVG.classList.add("timeline-event-svg");
-    autoAttackSVG.setAttribute("viewBox", "0 0 40 40");
-    // autoAttackSVG.setAttribute("title", tooltipText);
-
-    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.setAttribute(
-      "d",
-      "M 0 20 A 20 20 0 0 1 20 0 L 25 5 A 20 20 0 0 0 5 25 M 40 20 A 20 20 0 0 1 20 40 L 15 35 A 20 20 0 0 0 35 15"
-    );
-
-    autoAttackSVG.appendChild(path);
-    div.appendChild(autoAttackSVG);
     return div;
   }
 
