@@ -1,0 +1,22 @@
+{
+  "Power Surge": {
+    "color": "#82d6be",
+    "index": 0
+  },
+  "Lance Charge": {
+    "color": "#aa4444",
+    "index": 1
+  },
+  "Battle Litany": {
+    "color": "#8db5b0",
+    "index": 2
+  },
+  "Life of the Dragon": {
+    "color": "#80c7fc",
+    "index": 3
+  },
+  "Life Surge": {
+    "color": "#8f1c10",
+    "index": 4
+  }
+}

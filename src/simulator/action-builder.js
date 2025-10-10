@@ -43,14 +43,17 @@ class ActionBuilder {
       },
 
       /**
-       * Sets a callback function which determines if the action is allowed to be executed.
-       * @param {function} callback
+       * Sets a Condition property that defines certain rules for an action to be executed.
+       *
+       * Implemented conditions:
+       *
+       * hasStatus - status-name. Supports an array.
+       *
+       * hasResource - { resource-name: { trait } }
+       * @param {Object} conditions
        */
-      setCondition(callback) {
-        this.condition = function (args) {
-          const res = callback.call(this, args);
-          return !res ? false : res;
-        };
+      setCondition(conditions) {
+        this.condition = conditions;
         return this;
       },
 

@@ -118,7 +118,7 @@ export class Gearset {
         run: function () {
           this.simulator.reset();
           this.simulator.simulate([], 60, 0, true, true);
-          this.data = this.simulator.events;
+          this.data = this.simulator.results;
         },
         data: null,
       },

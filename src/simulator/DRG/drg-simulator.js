@@ -10,9 +10,9 @@ export class StandardSimulationDRG extends Simulator {
 
   simulate(actionsOverwrite, duration, start = 0, endWhenNoActions = false, simAutoAttacks = true) {
     if (!actionsOverwrite || actionsOverwrite.length === 0) {
-      super.simulate(this.#actionsDefault, duration, start, endWhenNoActions, simAutoAttacks);
+      return super.simulate(this.#actionsDefault, duration, start, endWhenNoActions, simAutoAttacks);
     } else {
-      super.simulate(actionsOverwrite, duration, start, endWhenNoActions, simAutoAttacks);
+      return super.simulate(actionsOverwrite, duration, start, endWhenNoActions, simAutoAttacks);
     }
   }
 
@@ -42,5 +42,7 @@ export class StandardSimulationDRG extends Simulator {
     Actions.actDrakesbane,
     Actions.actRaidenThrust,
     Actions.WyrmwindThrust,
+    Actions.actSpiralBlow,
+    Actions.actChaoticSpring,
   ];
 }

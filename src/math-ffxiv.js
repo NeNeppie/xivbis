@@ -70,14 +70,16 @@ function getCritMultiplier(lv, statCrit) {
   return (1400 + getSubstatModifier(lv, statCrit, 200)) / 1000;
 }
 
-function getWeaponDamageMultiplier(lv, job, weaponDamage, isAuto = false) {
-  const attribute = isAuto ? jobs[job].autoStat : jobs[job].mainStat;
+function getWeaponDamageMultiplier(lv, job, weaponDamage) {
+  const attribute = jobs[job].mainStat;
   const statModifier = jobModifiers[job][attribute];
-  return flr((levelModifiers[lv].main * statModifier) / 10 + weaponDamage);
+  return flr((levelModifiers[lv].main * statModifier) / 10 + weaponDamage) / 100;
 }
 
 function getAutoAttackModifier(lv, job, weaponDamage, delay) {
-  return flr(getWeaponDamageMultiplier(lv, job, weaponDamage, true) * (delay / 3));
+  const attribute = jobs[job].autoStat;
+  const statModifier = jobModifiers[job][attribute];
+  return flr(flr((levelModifiers[lv].main * statModifier) / 10 + weaponDamage) * (delay / 3000)) / 100;
 }
 
 function getAttackPower(lv, job, attribute) {
@@ -120,7 +122,7 @@ function getGlobalCoolDown(lv, statSpeed, baseGCD) {
  * @param {Number} potency Action potency
  * @param {String} actionType Determines which Speed stat is used.
  */
-export function calculateBaseDamage(level, job, stats, potency, actionType, isAuto = false, isDot = false, buffs) {
+export function calculateRawDamage(level, job, stats, potency, actionType, isAuto = false, isDot = false, buffs) {
   const attribute = isAuto ? stats[jobs[job].autoStat] : stats[jobs[job].mainStat];
   const speedStat = isAuto || actionType === "physical" || actionType === "weaponskill" ? stats.spdSkill : stats.spdSpell;
 
@@ -147,12 +149,7 @@ export function calculateBaseDamage(level, job, stats, potency, actionType, isAu
     // TODO: Caster formula for magical jobs.
     // Damage type actually has nothing to do with the damage formula; it only affects the speed stat used in calculations
   } else {
-    // Re-insert flooring according to Non-caster formula
-    // var damage2 = flr(
-    //   flr(flr(flr((potency / 100) * multiplierAP * multiplierDET) * multiplierTNC) * multiplierSPD) * multiplierWD
-    // );
-
-    var damage = flr((potency / 100) * multiplierWD * flr(multiplierAP * multiplierDET, 2)) * multiplierTNC * multiplierSPD;
+    var damage = flr(flr(flr(flr(potency * multiplierAP * multiplierDET) * multiplierTNC) * multiplierSPD) * multiplierWD);
   }
 
   damage *= jobs[job].traitBonus ?? 1;
@@ -165,26 +162,11 @@ export function calculateBaseDamage(level, job, stats, potency, actionType, isAu
   return flr(damage, 2);
 }
 
-function applyAutoCrit(level, statCrit, damage, bonusCritRate = 0) {
-  const multiplierCrit = getCritMultiplier(level, statCrit);
-  const criticalHitBonus = 1 + bonusCritRate * (multiplierCrit - 1);
-
-  return flr(damage * multiplierCrit * criticalHitBonus, 2);
-}
-
 function multAutoCrit(level, statCrit, bonusCritRate = 0) {
   const multiplierCrit = getCritMultiplier(level, statCrit);
   const criticalHitBonus = 1 + bonusCritRate * (multiplierCrit - 1);
 
   return multiplierCrit * criticalHitBonus;
-}
-
-function applyCritHit(level, statCrit, damage, bonusCritRate = 0) {
-  const multiplierCrit = getCritMultiplier(level, statCrit);
-  const probabilityCrit = getCritHitRate(level, statCrit) / 100;
-
-  const criticalHit = 1 + (probabilityCrit + bonusCritRate) * (multiplierCrit - 1);
-  return flr(damage * criticalHit, 2);
 }
 
 function multCritHit(level, statCrit, bonusCritRate = 0) {
@@ -194,23 +176,10 @@ function multCritHit(level, statCrit, bonusCritRate = 0) {
   return 1 + (probabilityCrit + bonusCritRate) * (multiplierCrit - 1);
 }
 
-function applyAutoDirect(damage, bonusDirectRate = 0) {
-  const directHitBonus = 1 + bonusDirectRate * 0.25;
-
-  return flr(damage * 1.25 * directHitBonus, 2);
-}
-
 function multAutoDirect(bonusDirectRate = 0) {
   const directHitBonus = 1 + bonusDirectRate * 0.25;
 
   return 1.25 * directHitBonus;
-}
-
-function applyDirectHit(level, statDH, damage, bonusDirectRate = 0) {
-  const probabilityDirect = getDirectHitRate(level, statDH) / 100;
-
-  const directHit = 1 + (probabilityDirect + bonusDirectRate) * 0.25;
-  return flr(damage * directHit, 2);
 }
 
 function multDirectHit(level, statDH, bonusDirectRate = 0) {
@@ -236,7 +205,7 @@ export function applyCritDh(level, baseDamage, stats, buffCrit = 0, buffDirect =
  * Performs action damage calculation. Returns computed damage with and without Crit/Direct Hit applied
  */
 export function calculateDamage(level, job, stats, potency, dmgType, isAuto = false, isDot = false, buffs = {}) {
-  const baseDamage = calculateBaseDamage(level, job, stats, potency, dmgType, isAuto, isDot, buffs);
+  const rawDamage = calculateRawDamage(level, job, stats, potency, dmgType, isAuto, isDot, buffs);
 
   const multiplierCritDamage = buffs.autocrit
     ? multAutoCrit(level, stats.crit, buffs.crit)
@@ -244,8 +213,7 @@ export function calculateDamage(level, job, stats, potency, dmgType, isAuto = fa
   const multiplierDhDamage = buffs.autodirect
     ? multAutoDirect(buffs.direct)
     : multDirectHit(level, stats.directHit, buffs.direct);
-  const expectedDamage = flr(baseDamage * multiplierCritDamage * multiplierDhDamage, 2);
+  const expectedDamage = flr(rawDamage * multiplierCritDamage * multiplierDhDamage, 2);
 
-  // Refactor NOTE: rename 'base' to 'raw'
-  return { base: baseDamage, expected: expectedDamage };
+  return { raw: rawDamage, expected: expectedDamage };
 }

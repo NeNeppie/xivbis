@@ -16,13 +16,6 @@ debugGearset.debugStats = {
   // auto?: 134.39
 };
 
-function getEventsByParams(events, types, names) {
-  return events.flatMap((event) => {
-    if ((!types || types.includes(event.type)) && (!names || names.includes(event.name))) return [event];
-    else return [];
-  });
-}
-
 /*
 As a proof of concept I'll use:
 `Dragoon` for all abilities, and
@@ -33,7 +26,7 @@ describe("Tracker-based Simulator Testing", () => {
   const simulator = new StandardSimulationDRG(debugGearset);
   simulator.stats = debugGearset.debugStats;
 
-  describe("Running combo actions in the simulator", () => {
+  describe("Combo Actions", () => {
     let results = [];
     const actions = [
       // First Sequence
@@ -54,87 +47,89 @@ describe("Tracker-based Simulator Testing", () => {
 
     simulator.reset();
     simulator.simulate(actions, 30, 0, true, false);
-    let filteredEvents = getEventsByParams(simulator.events, ["Action", "Error"]);
+    const events = simulator.results.action;
 
     [
       it("Actions with no combo requirement should create events with `combo` set to `True`", () => {
-        assert.condition(filteredEvents[0].data.combo);
+        assert.condition(events[0].data.combo);
       }),
 
       // Also tests for differentation between GCDs and OGCDs
       it("Successful combo executions should create damage events with `combo` set to True", () => {
-        assert.condition(filteredEvents[2].data.combo);
+        assert.condition(events[2].data.combo);
       }),
 
       it("Combo followups to successful combo executions should also be True", () => {
-        assert.condition(filteredEvents[3].data.combo);
+        assert.condition(events[3].data.combo);
       }),
 
       it("Unsuccessful combo executions should create events with `combo` set to False", () => {
-        assert.strictEquals(false, filteredEvents[4].data.combo);
+        assert.strictEquals(false, events[4].data.combo);
       }),
 
       it("Combo followups to unsuccessful combo executions should also be False", () => {
-        assert.strictEquals(false, filteredEvents[5].data.combo);
-        assert.strictEquals(false, filteredEvents[6].data.combo);
+        assert.strictEquals(false, events[5].data.combo);
+        assert.strictEquals(false, events[6].data.combo);
       }),
 
       it("Throw an error when attempting to execute followup actions with prerequisites unmet", () => {
-        assert.strictEquals("Error", filteredEvents[7].type);
+        assert.condition(events[7].data.errorMessage);
       }),
 
       it("Combo followups to failed actions count as unsuccessful ", () => {
-        assert.strictEquals(false, filteredEvents[9].data.combo);
-        assert.strictEquals(false, filteredEvents[10].data.combo);
+        assert.strictEquals(false, events[9].data.combo);
+        assert.strictEquals(false, events[10].data.combo);
       }),
     ].forEach((e) => results.push(e));
 
     // Print events for easier debugging
     if (results.includes(false)) {
-      // console.table(simulator.events);
-      simulator.events.forEach((e) => {
-        console.dir(e, { depth: 3 });
-      });
+      console.table(events);
+      // simulator.results.action.forEach((e) => {
+      //   console.dir(e, { depth: 3 });
+      // });
     }
   });
 
-  describe("Event Categories, Types and Names", () => {
+  describe("General", () => {
     let results = [];
     const actions = [Actions.actRaidenThrust, Actions.actTrueThrust, Actions.actSpiralBlow, Actions.actChaoticSpring];
 
     simulator.reset();
     simulator.simulate(actions, 30, 0, true, false);
+    const eventsAction = simulator.results.action;
+    const eventsStatus = simulator.results.status;
 
     [
       it("Failed actions should fire an error event", () => {
-        assert.strictEquals("Error", simulator.events[0].type);
+        assert.condition(eventsAction[0].data.errorMessage);
       }),
 
       // Are there any exceptions?
       it("Status Effects do not affect their parent action", () => {
-        const index = simulator.events.findIndex((e) => e.name === "Spiral Blow");
-        const statusEvent = simulator.events[index - 1];
-        const actionEvent = simulator.events[index];
+        const statusEvent = eventsStatus.find((e) => e.startTime === 2.5);
+        const actionEvent = eventsAction.find((e) => e.elapsed === 2.5);
 
-        assert.partialDeepEquals({ elapsed: 2.5, name: "Power Surge" }, statusEvent);
+        assert.partialDeepEquals({ name: "Power Surge" }, statusEvent);
         assert.partialDeepEquals({ damage: 0 }, actionEvent.data.buffs);
       }),
 
       // According to logs: Effects apply on use, damage and dots apply after applicationTime
       it("DoTs apply at the same time as their source's damage", () => {
-        const events = getEventsByParams(simulator.events, undefined, "Chaotic Spring");
+        const dotAction = eventsAction.find((e) => e.name === "Chaotic Spring");
         // Ignoring application time
-        events.forEach((event) => assert.strictEquals(5, event.elapsed));
+        assert.strictEquals(5, dotAction.elapsed);
       }),
     ].forEach((e) => results.push(e));
 
     // Print events for easier debugging
     if (results.includes(false)) {
-      console.table(simulator.events);
+      console.table(simulator.results.action);
+      console.table(simulator.results.status);
     }
   });
 
-  describe("Off-global Cooldowns and Status Effects", () => {
+  describe("OGCDs and Status Effects", () => {
     let results = [];
     const actions = [
       Actions.actTrueThrust,
@@ -160,63 +155,62 @@ describe("Tracker-based Simulator Testing", () => {
     ];
 
     simulator.reset();
-    simulator.simulate(actions, 30, 0, true, false);
+    const simRes = simulator.simulate(actions, 30, 0, true, false);
+    const eventsAction = simRes.action;
+    const eventsStatus = simRes.status;
 
     [
       it("OGCDs don't interrupt the Global Cooldown time", () => {
-        assert.equals(2.5, simulator.events.find((e) => e.name === "Spiral Blow").elapsed);
-        assert.equals(5, simulator.events.find((e) => e.name === "Chaotic Spring").elapsed);
+        assert.equals(2.5, eventsAction.find((e) => e.name === "Spiral Blow").elapsed);
+        assert.equals(5, eventsAction.find((e) => e.name === "Chaotic Spring").elapsed);
       }),
 
       it("Double weaving OGCDs with low animation lock", () => {
-        const weave1 = simulator.events.find((e) => e.name === "Life Surge");
-        const weave2 = simulator.events.find((e) => e.name === "Battle Litany");
-        assert.equals(2.5, simulator.events.find((e) => e.name === "Spiral Blow").elapsed);
+        const weave1 = eventsAction.find((e) => e.name === "Life Surge");
+        const weave2 = eventsAction.find((e) => e.name === "Battle Litany");
+        assert.equals(2.5, eventsAction.find((e) => e.name === "Spiral Blow").elapsed);
         assert.condition(weave1.elapsed > 2.5 && weave1.elapsed < 5);
         assert.condition(weave2.elapsed > 2.5 && weave2.elapsed < 5);
-        assert.equals(5, simulator.events.find((e) => e.name === "Chaotic Spring").elapsed);
+        assert.equals(5, eventsAction.find((e) => e.name === "Chaotic Spring").elapsed);
       }),
 
       it("Buffs should activate correctly", () => {
         // Test for damage up buff on an action following Spiral Blow
-        const events = getEventsByParams(simulator.events, "Action");
-        assert.equals(0.1, events[2].data.buffs.damage);
+        assert.equals(0.1, eventsAction[2].data.buffs.damage);
 
         // Test for Life Surge on Chaotic Spring making it a guaranteed crit
-        const event = simulator.events.find((e) => e.name === "Chaotic Spring");
+        const event = eventsAction.find((e) => e.name === "Chaotic Spring");
         assert.condition(event.data.effects.find((e) => e.name === "Life Surge"));
         assert.partialDeepEquals({ autocrit: true }, event.data.buffs);
       }),
 
       it("Multiple damage buffs stacking", () => {
-        // Test for { 0.21 damage, 0.1 crit } buff on 2nd True Thrust
-        const event = getEventsByParams(simulator.events, "Action", "Wheeling Thrust")[0];
+        // Test for { 0.21 damage, 0.1 crit } buff on first Wheeling Thrust
+        const event = eventsAction.find((e) => e.name === "Wheeling Thrust");
         assert.partialDeepEquals({ damage: 0.21, crit: 0.1 }, event.data.buffs);
       }),
 
       it("Only primary buff type should snapshot to DoTs", () => {
         // Test for 'damage', 'crit' and 'direct' existing while Life Surge status type does not
-        const chaotic = getEventsByParams(simulator.events, "Action", "Chaotic Spring")[0];
+        const chaotic = eventsAction.find((e) => e.name === "Chaotic Spring");
         assert.deepEquals({ damage: 0.1, crit: 0.1, direct: 0, autocrit: true, autodirect: false }, chaotic.data.buffs);
         assert.deepEquals({ damage: 0.1, crit: 0.1, direct: 0 }, chaotic.data.appliedDot[0].buffs);
       }),
 
       it("Buffs applying according to restrictions", () => {
         // Test Life Surge proccing on a GCD (Weaponskill) and not OGCD
-        const events = getEventsByParams(simulator.events, "Action");
-        const index = events.indexOf(events.find((e) => e.name === "Life Surge"));
+        const index = eventsAction.indexOf(eventsAction.find((e) => e.name === "Life Surge"));
 
-        assert.strictEquals("Battle Litany", events[index + 1].name);
-        assert.partialDeepEquals({ autocrit: false }, events[index + 1].data.buffs);
-        assert.strictEquals("Chaotic Spring", events[index + 2].name);
-        assert.partialDeepEquals({ autocrit: true }, events[index + 2].data.buffs);
+        assert.strictEquals("Battle Litany", eventsAction[index + 1].name);
+        assert.partialDeepEquals({ autocrit: false }, eventsAction[index + 1].data.buffs);
+        assert.strictEquals("Chaotic Spring", eventsAction[index + 2].name);
+        assert.partialDeepEquals({ autocrit: true }, eventsAction[index + 2].data.buffs);
       }),
 
       it("Buffs with stacks getting used up correctly", () => {
         // Test Life Surge proccing only on Chaotic Spring
-        const events = getEventsByParams(simulator.events, "Action");
-        const chaotic = events.find((e) => e.name === "Chaotic Spring");
-        const thrust = events.find((e) => e.name === "Wheeling Thrust");
+        const chaotic = eventsAction.find((e) => e.name === "Chaotic Spring");
+        const thrust = eventsAction.find((e) => e.name === "Wheeling Thrust");
 
         assert.partialDeepEquals({ autocrit: true }, chaotic.data.buffs);
         assert.partialDeepEquals({ autocrit: false }, thrust.data.buffs);
@@ -224,42 +218,48 @@ describe("Tracker-based Simulator Testing", () => {
 
       it("Buffs getting refreshed correctly", () => {
         // Test Life Surge proccing on Drakesbane after being previously applied on Chaotic Spring
-        const drakesbane = simulator.events.find((e) => e.name === "Drakesbane");
+        const drakesbane = eventsAction.find((e) => e.name === "Drakesbane");
         assert.partialDeepEquals({ autocrit: true }, drakesbane.data.buffs);
+      }),
+
+      it("Buffs' duration is dependant on their usage", () => {
+        // Test Life Surge: endtime - starttime < duration
+        const lifeSurge = eventsStatus.find((e) => e.name === "Life Surge");
+        assert.condition(lifeSurge.endTime - lifeSurge.startTime < 5);
+        assert.condition(lifeSurge.duration < 5);
       }),
 
       it("Can use actions with multiple charges within cooldown period", () => {
         // Third Life Surge use should throw an error instead.
-        const lifeSurges = getEventsByParams(simulator.events, "Action", "Life Surge");
+        const lifeSurges = eventsAction.filter((e) => e.name === "Life Surge" && !e.data.errorMessage);
         assert.condition(lifeSurges.length === 2);
       }),
 
       it("OGCDs adhere to their cooldowns", () => {
         // Test for an error on 3rd Life Surge & 2nd Lance Charge use attempts
-        const lifeSurges = getEventsByParams(simulator.events, ["Action", "Error"], "Life Surge");
-        const lanceCharges = getEventsByParams(simulator.events, ["Action", "Error"], "Lance Charge");
+        const lifeSurges = eventsAction.filter((e) => e.name === "Life Surge");
+        const lanceCharges = eventsAction.filter((e) => e.name === "Lance Charge");
 
         assert.condition(lifeSurges.length === 3);
         assert.condition(lanceCharges.length === 2);
-        assert.strictEquals("Error", lifeSurges[2].type);
-        assert.strictEquals("Error", lanceCharges[1].type);
+        assert.condition(lifeSurges[2].data.errorMessage);
+        assert.condition(lanceCharges[1].data.errorMessage);
       }),
 
       it("GCDs clip when triple weaving / using multiple OGCDs with high animation locks", () => {
         // Test that final GCD use time far exceeds what it should be
-        const event = simulator.events[simulator.events.length - 1];
+        const event = eventsAction[eventsAction.length - 1];
         assert.condition(event.elapsed > 15);
       }),
     ].forEach((e) => results.push(e));
 
     // Print events for easier debugging
     if (results.includes(false)) {
-      console.table(simulator.events);
-      // simulator.events.forEach((e) => {
-      //   if (e.type === "Action") {
-      //     console.dir(e, { depth: 3 });
-      //   }
-      // });
+      console.table(eventsAction);
+      console.table(eventsStatus);
+      eventsAction.forEach((e) => {
+        console.dir(e, { depth: 3 });
+      });
     }
   });
 
@@ -294,7 +294,9 @@ describe("Tracker-based Simulator Testing", () => {
 
     simulator.reset();
     simulator.simulate(actions, 60, 0, false, true);
-    console.table(simulator.events);
+    console.table(simulator.results.action);
+    console.table(simulator.results.status);
+    console.table(simulator.results.gauge);
     // simulator.events.forEach((e) => {
     //   console.dir(e, { depth: 3 });
     // });

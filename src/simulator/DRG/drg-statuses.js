@@ -6,7 +6,6 @@ export const PowerSurge = {
   description: "Increases Damage dealt by 10%",
   effect: { damage: 0.1 },
   duration: 30,
-  stacks: -1,
 };
 
 export const LanceCharge = {
@@ -16,7 +15,6 @@ export const LanceCharge = {
   description: "Increases Damage dealt by 10%",
   effect: { damage: 0.1 },
   duration: 20,
-  stacks: -1,
 };
 
 // NOTE: Special edge case: Life of the Dragon also allows execution of Stardiver AND Starcross. Both expire when this one does
@@ -28,7 +26,6 @@ export const LifeDragon = {
   description: "Increases Damage dealt by 15%",
   effect: { damage: 0.15 },
   duration: 20,
-  stacks: -1,
 };
 
 // Example for "crit rate up" buff. (x * amount) + amount
@@ -39,7 +36,6 @@ export const BattleLitany = {
   description: "Increases Critical Hit Rate by 10%",
   effect: { crit: 0.1 },
   duration: 20,
-  stacks: -1,
 };
 
 // Example for "auto crit" buff. MCH and WAR have "auto direct crit", need to futureproof that.

@@ -46,10 +46,10 @@ class Gauge {
     return this.#count;
   }
 
-  setCount(currTime, value) {
+  set count(value) {
     if (this.#count !== undefined && value !== this.#count) {
       const clamped = Math.max(Math.min(value, this.maxCount), 0);
-      this.#parent.addRecord(currTime, this, { count: clamped });
+      this.#parent.addRecord(this, { count: clamped });
       this.#count = clamped;
     }
   }
@@ -58,39 +58,41 @@ class Gauge {
     return this.#time;
   }
 
-  setTime(currTime, value) {
+  set time(value) {
     if (this.#time !== undefined && value !== this.#time && !isNaN(value)) {
       const clamped = Math.max(Math.min(value, this.maxTime), 0);
-      this.#parent.addRecord(currTime, this, { time: clamped });
+      this.#parent.addRecord(this, { time: clamped });
       this.#time = clamped;
     }
   }
 
-  reset(currTime) {
-    this.#parent.addRecord(currTime, this, { count: this.initCount, time: this.initTime });
+  reset() {
+    this.#parent.addRecord(this, { count: this.initCount, time: this.initTime });
     this.#count = this.initCount;
     this.#time = this.initTime;
   }
 }
 
 export class SimulationGaugeRecorder {
-  // List of Gauge elements.
+  #currTime;
   #gauges = [];
-  // Records all gauge changes. Exported when `finalize()` is called
   #records;
-  // Indicates `finalize()` has been called
   #finalized;
 
-  constructor() {
-    this.initialize();
-  }
+  /** Manually call `initialize()` ! */
+  constructor() {}
 
   get gauges() {
     return this.#gauges;
   }
 
+  set elapsed(value) {
+    this.#currTime = value;
+  }
+
   /** Will NOT clear gauge elements stored */
   initialize() {
+    this.#currTime = 0;
     this.#gauges.forEach((gauge) => gauge.reset(0));
     this.#records = [];
     this.#finalized = false;
@@ -102,14 +104,9 @@ export class SimulationGaugeRecorder {
     return gauge;
   }
 
-  // getByName but seeing as there aren't any other values by which to fetch a gauge, byName becomes the default
-  get(name) {
-    return this.gauges.find((gauge) => gauge.name === name);
-  }
-
-  addRecord(currTime, gauge, newValues) {
+  addRecord(gauge, newValues) {
     const record = {
-      elapsed: currTime,
+      elapsed: this.#currTime,
       name: gauge.name,
       count: gauge.count,
       time: gauge.time,
@@ -117,6 +114,11 @@ export class SimulationGaugeRecorder {
       newTime: newValues.time ?? gauge.time,
     };
     this.#records.push(record);
+  }
+
+  // getByName but seeing as there aren't any other values by which to fetch a gauge, byName becomes the default
+  get(name) {
+    return this.gauges.find((gauge) => gauge.name === name);
   }
 
   // NOTE: Assumes records are sorted by elapsed time.

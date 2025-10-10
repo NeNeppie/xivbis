@@ -41,10 +41,9 @@ export const actDrakesbane = ActionBuilder.CreateWeaponskill("Drakesbane", -1)
   .setComboAction(["Wheeling Thrust", "Fang and Claw"], 460)
   .addStatusEffect(Statuses.RaidenThrust, true);
 
-// prettier-ignore
 export const actRaidenThrust = ActionBuilder.CreateWeaponskill("Raiden Thrust", 320)
-  .setTimers({ baseRecastTime: 2.5, applicationTime: 0.62, })
-  .setCondition(function(ctx) { return ctx.getActiveStatus("Draconian Fire") })
+  .setTimers({ baseRecastTime: 2.5, applicationTime: 0.62 })
+  .setCondition({ hasStatus: "Draconian Fire" })
   .addGaugeInfo("Firstmind's Focus", { changeCount: 1 });
 
 export const LifeSurge = ActionBuilder.CreateBaseOGCD("Life Surge", 0)
@@ -74,40 +73,33 @@ export const Geirskogul = ActionBuilder.CreateBaseOGCD("Geirskogul", 280)
   .addStatusEffect(Statuses.LifeDragon)
   .addStatusEffect(Statuses.NastrondReady);
 
-// prettier-ignore
 export const MirageDive = ActionBuilder.CreateBaseOGCD("Mirage Dive", 380)
   .setTimers({ cooldown: 1, applicationTime: 0.8 })
-  .setCondition(function(ctx) { return ctx.getActiveStatus("Dive Ready") })
+  .setCondition({ hasStatus: "Dive Ready" });
 
-// prettier-ignore
 export const Nastrond = ActionBuilder.CreateBaseOGCD("Nastrond", 720)
   .setTimers({ cooldown: 2, applicationTime: 0.76 })
-  .setCondition(function(ctx) { return ctx.getActiveStatus("Nastrond Ready") })
+  .setCondition({ hasStatus: "Nastrond Ready" });
 
-// prettier-ignore
 export const Stardiver = ActionBuilder.CreateBaseOGCD("Stardiver", 840)
   .setTimers({ cooldown: 30, applicationTime: 1.29, animationLock: 1.5 })
-  .setCondition(function(ctx) { return ctx.getActiveStatus("Life of the Dragon"); })
+  .setCondition({ hasStatus: "Life of the Dragon" })
   .addStatusEffect(Statuses.StarcrossReady);
 
-// prettier-ignore
 export const WyrmwindThrust = ActionBuilder.CreateBaseOGCD("Wyrmwind Thrust", 440)
   .setTimers({ cooldown: 10, applicationTime: 1.2 })
-  .setCondition(function(ctx) { return ctx.gauge.get("Firstmind's Focus")?.count === 2 })
+  .setCondition({ hasResource: { "Firstmind's Focus": { count: 2 } } })
   .addGaugeInfo("Firstmind's Focus", { reset: true });
 
-// prettier-ignore
 export const RiseoftheDragon = ActionBuilder.CreateBaseOGCD("Rise of the Dragon", 550)
   .setTimers({ cooldown: 1, applicationTime: 1.16 })
-  .setCondition(function(ctx) { return ctx.getActiveStatus("Dragon's Flight") })
+  .setCondition({ hasStatus: "Dragon's Flight" });
 
 // NOTE: Action unusable when both conditions aren't met at once. But Starcross Ready will not expire when LotD does, unlike in-game
 //       Could there be a scenario where this results in unwanted behaviour?
 export const Starcross = ActionBuilder.CreateBaseOGCD("Starcross", 1000)
   .setTimers({ cooldown: 1, applicationTime: 0.985 })
-  .setCondition(function (ctx) {
-    return ctx.getActiveStatus("Life of the Dragon") && ctx.getActiveStatus("Starcross Ready");
-  });
+  .setCondition({ hasStatus: ["Life of the Dragon", "Starcross Ready"] });
 
 // prettier-ignore
 {

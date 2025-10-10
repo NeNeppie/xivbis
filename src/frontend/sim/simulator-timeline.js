@@ -1,6 +1,6 @@
 import { Gearset } from "../../gearset.js";
 import { createElementEx, getIconUrl } from "../ui-core.js";
-import StatusColors from "./effect-frontend-colors.json" with { type: "json" };
+import StatusConsts from "./effect-frontend-const.json" with { type: "json" };
 
 export default class TimelineElement extends HTMLDivElement {
   #gearset;
@@ -70,28 +70,33 @@ export default class TimelineElement extends HTMLDivElement {
     }
 
     this.divTimeRuler.setAttribute("data-count", simulation.simulator.elapsed);
-    const records = simulation.data;
-    console.table(records);
+    const simData = simulation.data;
+    const actionRecords = simData.action;
+    const statusRecords = simData.status;
+    const gaugeInfo = simData.gauge.gauges;
+    const gaugeRecords = simData.gauge.records;
 
-    const buffElevation = {};
-    const uniqueBuffs = {};
-    for (const obj of records.filter((record) => record.type === "Status Effect" && record.data.type === "buff").reverse()) {
-      uniqueBuffs[obj.name] = obj;
+    const uniqueBuffs = new Set();
+    for (const obj of statusRecords.filter((record) => record.type === "buff").reverse()) {
+      uniqueBuffs.add(obj.name);
     }
-    Object.values(uniqueBuffs).forEach((br, i, arr) => {
-      buffElevation[br.name] = ((this.divSkillBoard.clientHeight - 20 - this.iconWidth * 3) / arr.length) * i; // zero-indexed, on purpose.
-    });
 
     const rulerTick = this.divTimeRuler.firstChild;
-    for (const record of records) {
-      if (record.type === "Action") {
-        if (record.name === "Auto Attack") {
-          var eventDiv = this.createEventAutoAttack(record, rulerTick);
-        } else {
-          var eventDiv = this.createEventAction(record, rulerTick);
-        }
-      } else if (record.type === "Status Effect" && record.data.type === "buff") {
-        var eventDiv = this.createEventBuff(record, rulerTick, buffElevation[record.name]);
+    for (const record of actionRecords) {
+      if (record.name === "Auto Attack") {
+        var eventDiv = this.createEventAutoAttack(record, rulerTick);
+      } else {
+        var eventDiv = this.createEventAction(record, rulerTick);
+      }
+
+      this.divSkillBoard.appendChild(eventDiv);
+    }
+
+    for (const record of statusRecords) {
+      if (record.type === "buff") {
+        const hLevel =
+          StatusConsts[record.name].index * ((this.divSkillBoard.clientHeight - 20 - this.iconWidth * 3) / uniqueBuffs.size);
+        var eventDiv = this.createEventBuff(record, rulerTick, hLevel);
       } else {
         continue;
       }
@@ -139,19 +144,18 @@ export default class TimelineElement extends HTMLDivElement {
   }
 
   createEventBuff(record, rulerTick, hLevel) {
-    const posX = record.elapsed * rulerTick.clientWidth;
+    const posX = record.startTime * rulerTick.clientWidth;
     const posY = this.iconWidth * 3;
 
-    let tooltipText = `${record.name}\nUsed at: ${record.elapsed}s\nDuration: ${record.data.duration}s\n${record.data.description}`;
+    let tooltipText = `${record.name}\nUsed at: ${record.startTime}s\nDuration: ${record.duration}s\n${record.description}`;
     const imgSrc = getIconUrl(record.id);
 
     const div = createElementEx("div", {
-      "data-timestamp": record.elapsed,
-      "data-duration": record.data.duration,
+      "data-timestamp": record.startTime,
+      "data-duration": record.duration,
       class: "timeline-event timeline-event-buff",
-      style: `--data-color: ${StatusColors[record.name] ?? ""}; --data-width: ${
-        /* TODO: Past sins come back to bite me as correct durations are saved on action events that own the buff and not on buff events */
-        record.data.duration * rulerTick.clientWidth
+      style: `--data-color: ${StatusConsts[record.name].color ?? ""}; --data-width: ${
+        record.duration * rulerTick.clientWidth
       }px; --data-level: ${hLevel}px; transform: translate(${posX}px, ${posY}px);`,
     });
 
