@@ -21,3 +21,66 @@ export function getIconUrl(id, isHighRes = false) {
   }
   return `https://v2.xivapi.com/api/asset/ui/icon/${paddedThousand}/${paddedId}.tex?format=png`;
 }
+
+export class CustomTable extends HTMLTableElement {
+  constructor() {
+    super();
+
+    this.customHeaders = [];
+    this.classList.add("table-base");
+  }
+
+  connectedCallback() {
+    const colgroup = createElementEx("colgroup");
+    const thead = this.createTHead();
+    const headerRow = thead.insertRow(0);
+
+    let headers = [];
+    for (const headerInfo of this.customHeaders) {
+      const header = new ExtendedHeader(headerInfo);
+      if (header.condition()) {
+        let col = createElementEx("col");
+        if (header.colWidth) {
+          col.style.width = `${header.colWidth}px`;
+          col.style.minWidth = `${header.colWidth}px`;
+        } else {
+          col.style.width = `100%`;
+        }
+
+        colgroup.append(col);
+        headerRow.appendChild(header);
+        headers.push(header);
+      }
+    }
+    this.customHeaders = headers;
+    this.createTBody();
+    this.prepend(colgroup);
+  }
+}
+
+class ExtendedHeader extends HTMLTableCellElement {
+  callback = () => {};
+  condition = () => true;
+  headerClasses = [];
+  colClasses = [];
+  name = "";
+  colWidth = 0;
+
+  constructor(obj) {
+    super();
+
+    for (const key of Object.keys(obj)) {
+      if (key in this) {
+        this[key] = obj[key];
+      }
+    }
+  }
+
+  connectedCallback() {
+    super.textContent = this.name;
+    super.classList.add(...this.headerClasses);
+  }
+}
+
+if (!customElements.get("table-extended")) customElements.define("table-extended", CustomTable, { extends: "table" });
+if (!customElements.get("th-extended")) customElements.define("th-extended", ExtendedHeader, { extends: "th" });

@@ -1,6 +1,6 @@
 import { convertParamToAbbr, convertParamToAbbrSingle } from "../gearset.js";
 import { sumObjectsByKey } from "../utils/math-utils.js";
-import { createElementEx } from "./ui-core.js";
+import { createElementEx, CustomTable } from "./ui-core.js";
 
 const MESSAGE_LOADING = "Loading...";
 const MESSAGE_LOAD_ERROR = "Error loading content.";
@@ -71,17 +71,11 @@ const statList = [
   "Spell Speed",
 ];
 
-class GearTable extends HTMLTableElement {
-  #headers = [];
-
+class GearTable extends CustomTable {
   constructor(job) {
     super();
 
-    this.loaded = false;
-    this.job = job;
-    this.classList.add("tb", "gear-selects");
-
-    this.#headers = [
+    this.customHeaders = [
       {
         name: "ilvl",
         callback: (data) => {
@@ -124,7 +118,7 @@ class GearTable extends HTMLTableElement {
     ];
 
     for (const stat of statList) {
-      this.#headers.push({
+      this.customHeaders.push({
         name: convertParamToAbbrSingle(stat),
         callback: (data) => {
           const stats = sumObjectsByKey(data.stats, data.statsHQ);
@@ -136,38 +130,24 @@ class GearTable extends HTMLTableElement {
         headerClasses: ["stat-header"],
       });
     }
+
+    this.job = job;
+    this.loaded = false;
+    this.classList.add("table-selectable", "table-stripped");
   }
 
   connectedCallback() {
-    const colgroup = createElementEx("colgroup");
+    super.connectedCallback();
+
     const titleCell = createElementEx("th", { colSpan: 999, style: "text-align: center;" });
     // FIXME: Formatting for leftring & rightring
     titleCell.textContent = "~-~ " + this.id.toUpperCase() + " ~-~";
-
     this.insertRow(0).appendChild(titleCell);
-    const headerRow = this.insertRow(1);
 
-    for (const headerInfo of this.#headers) {
-      const header = new ExtendedHeader(headerInfo);
-      if (header.condition()) {
-        let col = createElementEx("col");
-        if (header.colWidth) {
-          col.style = `width: ${header.colWidth}px; min-width: ${header.colWidth}px;`;
-        } else {
-          col.style = "width: 100%;";
-        }
-        colgroup.append(col);
-
-        headerRow.appendChild(header);
-      }
-    }
-
-    const infoCell = this.insertRow(-1).insertCell();
+    const infoCell = this.tBodies[0].insertRow(-1).insertCell();
     infoCell.colSpan = 999;
     infoCell.style = "text-align: center; height: 300px;";
     infoCell.textContent = MESSAGE_LOADING;
-
-    this.prepend(colgroup);
   }
 
   addRow(item, gearset) {
@@ -233,35 +213,10 @@ class GearTableRow extends HTMLTableRowElement {
   }
 }
 
-class ExtendedHeader extends HTMLTableCellElement {
-  callback = () => {};
-  condition = () => true;
-  headerClasses = [];
-  colClasses = [];
-  name = "";
-  colWidth = 0;
-
-  constructor(obj) {
-    super();
-    super.scope = "col";
-
-    for (const key of Object.keys(obj)) {
-      if (key in this) {
-        this[key] = obj[key];
-      }
-    }
-  }
-
-  connectedCallback() {
-    super.textContent = this.name;
-    super.classList.add(...this.headerClasses);
-  }
-}
-
 if (!customElements.get("gear-row")) customElements.define("gear-row", GearTableRow, { extends: "tr" });
 if (!customElements.get("gear-table")) customElements.define("gear-table", GearTable, { extends: "table" });
-if (!customElements.get("th-extended")) customElements.define("th-extended", ExtendedHeader, { extends: "th" });
 
+// TODO: Adding custom items
 // const testRow = new GearTableRow({
 //   id: 99999,
 //   itemLevel: 735,
@@ -276,10 +231,3 @@ if (!customElements.get("th-extended")) customElements.define("th-extended", Ext
 //   name: "Augmented Illegal Item for Funsies of Healing",
 //   materiaSlots: 5,
 // });
-
-// const testTable = new GearTable();
-// testTable.id = "custom items (PoC)";
-
-// var div = document.getElementById("gear-pair-left");
-// testTable.tBodies[0].append(testRow, testRow2);
-// div.appendChild(testTable);
