@@ -43,8 +43,8 @@ dialog[data-modal] {
   color: aliceblue;
   padding: 10px 10px 10px 20px;
   width: 75vw;
-  height: 50vh;
-  overflow: hidden;
+  height: 90vh;
+  overflow: scroll;
 
   &::backdrop {
     background-color: hsla(0, 0%, 0%, 0.4);
@@ -68,6 +68,11 @@ button.popup-close {
 .align-right {
   float: right;
   margin-right: 5%;
+}
+
+.align-center {
+  float: none;
+  text-align: center;
 }
 
 .gear-pairs {
@@ -116,9 +121,9 @@ button.popup-close {
 
 .timeline {
   --ruler-tick-width: 1.75em;
-  --default-padding-left: calc(100% / 10 - var(--ruler-tick-width));
+  --default-padding-left: calc(100% / 20 - var(--ruler-tick-width));
 
-  height: 75%;
+  height: 35vh;
   padding: 10px 20px;
 
   .skillboard {
@@ -150,13 +155,14 @@ button.popup-close {
   .timeline-event-auto {
     &:before {
       content: "";
-      background-image: url("../src/frontend/assets/autoattack.svg"), linear-gradient(to top, grey 50%, white);
+      background-image: url("../src/frontend/assets/autoattack.svg");
       aspect-ratio: 1;
       width: 20px;
       height: 20px;
       position: absolute;
+      filter: invert(90%);
     }
-    filter: drop-shadow(0 0 1px white);
+    filter: drop-shadow(0 0 1px black);
   }
 
   .timeline-event-buff {
@@ -202,7 +208,7 @@ button.popup-close {
       display: inline-block;
       padding-left: var(--default-padding-left);
       margin-top: 1em;
-      min-width: 1.75em;
+      min-width: var(--ruler-tick-width);
       text-align: center;
       position: relative;
 
@@ -222,7 +228,7 @@ button.popup-close {
   }
 }
 
-table.tb {
+table.table-base {
   --inner-border-width: 0.0625rem;
   --cell-padding: 5px;
   --selected-cell-padding: calc(var(--cell-padding) - var(--inner-border-width));
@@ -242,6 +248,10 @@ table.tb {
   padding-top: 0.4375rem;
   margin-bottom: 1rem;
 
+  th {
+    text-align: center;
+  }
+
   td {
     padding: 0px var(--cell-padding) 0px var(--cell-padding);
   }
@@ -251,34 +261,107 @@ table.tb {
     transition: background 0.2s;
   }
 
-  tr:nth-child(2n + 3) {
+  &.table-stripped tr:nth-child(2n + 3) {
     background-color: #272727;
   }
 
-  tr.selected {
-    background-blend-mode: darken;
-    background-color: #ffd70022;
+  &.table-selectable {
+    tr.selected {
+      background-blend-mode: darken;
+      background-color: #ffd70022;
 
-    td {
-      border: var(--inner-border-width) solid #ffd700;
-      border-style: solid none;
+      td {
+        border: var(--inner-border-width) solid #ffd700;
+        border-style: solid none;
+      }
+
+      td:first-child {
+        border-left-style: solid;
+        border-top-left-radius: var(--global-border-radius);
+        border-bottom-left-radius: var(--global-border-radius);
+        padding-left: var(--selected-cell-padding);
+      }
+      td:last-child {
+        border-right-style: solid;
+        border-top-right-radius: var(--global-border-radius);
+        border-bottom-right-radius: var(--global-border-radius);
+        padding-right: var(--selected-cell-padding);
+      }
     }
 
-    td:first-child {
-      border-left-style: solid;
-      border-top-left-radius: var(--global-border-radius);
-      border-bottom-left-radius: var(--global-border-radius);
-      padding-left: var(--selected-cell-padding);
-    }
-    td:last-child {
-      border-right-style: solid;
-      border-top-right-radius: var(--global-border-radius);
-      border-bottom-right-radius: var(--global-border-radius);
-      padding-right: var(--selected-cell-padding);
+    tr:not(:nth-child(1), :nth-child(2)):hover {
+      background: #ffd70033;
     }
   }
+}
 
-  tr:not(:nth-child(1), :nth-child(2)):hover {
-    background: #ffd70033;
+table.infotable {
+  --infotable-row-height: 24px;
+
+  // min-width: 400px;
+  max-width: 1000px;
+  width: 100%;
+  overflow: auto;
+
+  img {
+    height: var(--infotable-row-height);
   }
+
+  tr {
+    height: var(--infotable-row-height);
+    max-height: var(--infotable-row-height);
+  }
+
+  td {
+    padding: 0 3px 0 3px;
+  }
+
+  td:first-child {
+    padding-left: var(--cell-padding);
+  }
+  td:last-child {
+    padding-right: var(--cell-padding);
+  }
+}
+
+table.infotable[is="sim-infotable-damage"] img:not(.buff-icon-small) {
+  background-color: grey;
+  border-radius: 10%;
+}
+
+.buff-icon-small {
+  max-height: 20px;
+}
+
+.table-flex-wrap {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: wrap;
+  width: 100%;
+  height: 800px;
+}
+
+.table-flex-group-primary {
+  flex: 0 0 100%;
+  width: calc(60% - 1rem);
+
+  @media (max-width: 800px) {
+    width: 100%;
+    flex: 2;
+  }
+}
+
+.table-flex-group {
+  flex: 0 0 50%;
+  width: 40%;
+
+  @media (max-width: 800px) {
+    width: 100%;
+    flex: 1;
+  }
+}
+
+.table-scroll-wrap {
+  margin-bottom: 1rem;
+  overflow-y: scroll;
 }

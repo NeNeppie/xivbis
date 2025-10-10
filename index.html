@@ -12,9 +12,20 @@
 
     <dialog data-modal="sim">
       <button id="sim-modal-hide" class="popup-close">X</button>
-      <div class="simulation">
-        <p>Simulation Window</p>
-        <p>Hello World!</p>
+      <p>Simulation Window</p>
+      <div is="sim-timeline"></div>
+      <div class="table-flex-wrap">
+        <div class="table-scroll-wrap table-flex-group-primary">
+          <table is="sim-infotable-damage"></table>
+        </div>
+        <div class="table-flex-group">
+          <div class="table-scroll-wrap">
+            <table is="sim-infotable-status"></table>
+          </div>
+          <div class="table-scroll-wrap">
+            <table is="sim-infotable-gauge"></table>
+          </div>
+        </div>
       </div>
     </dialog>
     <button id="sim-modal-show" class="align-right">Simulation Window</button>

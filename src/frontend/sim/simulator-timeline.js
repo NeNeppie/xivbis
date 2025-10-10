@@ -5,10 +5,8 @@ import StatusConsts from "./effect-frontend-const.json" with { type: "json" };
 export default class TimelineElement extends HTMLDivElement {
   #gearset;
 
-  constructor(gearset) {
+  constructor() {
     super();
-    this.#gearset = gearset;
-
     this.scroll = 0;
     this.iconWidth = 40;
     this.classList.add("timeline");
@@ -62,8 +60,11 @@ export default class TimelineElement extends HTMLDivElement {
     this.divTimeRuler.removeEventListener("scroll", this.#syncScrollBound, false);
   }
 
-  init(name = "standard") {
-    const simulation = this.#gearset.simulations.find((s) => s.name === name);
+  build(gearset, simName = "standard") {
+    this.#gearset = gearset;
+    this.divSkillBoard.innerHTML = "";
+
+    const simulation = this.#gearset.simulations.find((s) => s.name === simName);
     if (!simulation?.data) {
       console.warn("Attempted to construct simulation timeline without simulation data");
       return;
