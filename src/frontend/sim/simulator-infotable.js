@@ -89,8 +89,10 @@ export class DamageInfotable extends InfotableBase {
       {
         name: "Est. Damage",
         callback: (record) => {
-          // TODO: add total damage of dot
-          return record.data.damage.expected ?? "";
+          const dotDamage = record.data.appliedDot?.reduce((damage, curr) => damage + curr.damage.expected, 0) ?? 0;
+          const actionDamage = record.data.damage.expected ?? 0;
+          const total = dotDamage + actionDamage;
+          return total !== 0 ? total.toFixed(2) : "";
         },
         colWidth: 100,
       },

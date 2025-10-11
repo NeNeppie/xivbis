@@ -129,7 +129,7 @@ button.popup-close {
   .skillboard {
     background-size: calc(var(--ruler-tick-width) + var(--default-padding-left));
     background-image: linear-gradient(to right, grey 1px, transparent 1px),
-      linear-gradient(rgba(65, 105, 225, 0.5) 25%, transparent);
+      linear-gradient(rgba(171, 151, 110, 0.5) 25%, transparent);
     border: 2px solid var(--global-border-color);
     height: 75%;
     width: 100%;

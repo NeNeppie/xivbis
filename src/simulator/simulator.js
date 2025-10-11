@@ -304,15 +304,17 @@ export class StandardSimulation {
     action.dotInfo?.forEach((dot) => {
       if ((dot.requireCombo && comboValid) || !dot.requireCombo) {
         eventData.appliedDot ??= [];
-        const activeDot = this.getActiveDot(dot.name);
-        const dotFound = Boolean(activeDot);
 
-        if (dotFound) {
+        const activeDot = this.getActiveDot(dot.name);
+        if (activeDot) {
           // Cut off active dot's time and set tickCount accordingly
           activeDot.tickCount = this.dotActualTickCount(activeDot, this.elapsed + action.applicationTime);
           activeDot.endTime = this.elapsed + action.applicationTime;
+          activeDot.duration = activeDot.endTime - activeDot.startTime;
         }
-        eventData.appliedDot.push({ ...this.recordDot(dot, action.applicationTime, buffs), refreshed: dotFound });
+        // a "refresh" property is omitted to keep the object reference
+        // (though I could make it a function parameter, but it still serves no purpose at the moment)
+        eventData.appliedDot.push(this.recordDot(dot, action.applicationTime, buffs));
       }
     });
 
@@ -419,20 +421,14 @@ export class StandardSimulation {
 
     // iterating over dot applications and calculating their total damage based on
     // the number of actual ticks and their snapshotted damage buffs.
-    // Refactor NOTE: action events store applied dots, but these don't share the same reference as #dots records
-    //    An easy fix is to change the way new dots are pushed into action events, but maybe a design change is in order?
-    //    Not critical at the moment but would have implications on effective dps later on.
     this.#events.forEach((event) => {
-      if (event.type !== "Action") {
-        return;
-      }
-
       const dots = event.data.appliedDot ?? [];
       for (const dot of dots) {
         // Cut off any ongoing dots
-        if (this.isActive(dot)) {
+        if (this.isActive(dot) || dot.startTime > this.elapsed) {
           dot.tickCount = this.dotActualTickCount(dot, this.elapsed);
           dot.endTime = this.elapsed;
+          dot.duration = dot.endTime - dot.startTime;
         }
 
         const consolidated = calculateDamage(
@@ -446,7 +442,7 @@ export class StandardSimulation {
           dot.buffs
         );
 
-        dot.totalDamage = { raw: consolidated.raw * dot.tickCount, expected: consolidated.expected * dot.tickCount };
+        dot.damage = { raw: consolidated.raw * dot.tickCount, expected: consolidated.expected * dot.tickCount };
       }
     });
 
