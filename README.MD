@@ -40,13 +40,15 @@ The logic stage that binds all systems together via "Gearsets"
     - Support for materia [2.2/2.3]
     - Support for food / potions [2.2/2.3]
     - Item Stat display + Total Stat display redesign [2.3]
+    ✅ Simulation overview window
+    - DPS display, at-glance view for all added simulations
 
 ### Rotation stage `[3]`:
 
 Implementing realistic damage calculation by simulating a damage rotation for a set amount of time.
 
     ✅ Calculating Autos, accounting for SkS and weapon type
-    - Supporting action types:
+    ✅ Supporting action types:
         ✅ GCDs
         ✅ oGCDs (weaving, anim locks, etc.)
         ✅ DoTs
@@ -67,7 +69,7 @@ Implementing realistic damage calculation by simulating a damage rotation for a 
 | Dark Knight |   ❌    |    ❌    |
 |  Gunbreaker |   ❌    |    ❌    |
 |        Monk |   ❌    |    ❌    |
-|     Dragoon |   ✔️    |    ❌    |
+|     Dragoon |   ✔️    |    ✔️    |
 |       Ninja |   ❌    |    ❌    |
 |     Samurai |   ❌    |    ❌    |
 |      Reaper |   ❌    |    ❌    |
@@ -89,7 +91,22 @@ Implementing realistic damage calculation by simulating a damage rotation for a 
 
 Implmenting an algorithm that solves for BiS given "targets" and "limits"
 
-    - ???
+> init Gearset -> add/replace piece of gear -> run simulation -> compare dps -> repeat
+
+    - Solver Parameters
+        - GCD Speed, in a range or enforcing a target speed value
+        - Ilvl Range of gear used
+        - Job Level
+        - Ilvl Sync to determine materia usage
+        - Materia / Food inclusion
+    🟨 Basic algorithm
+        ✅ Iterating gear list and equipping gear pieces one by one
+        ✅ Comparing dps between iterations or "nodes"
+    - Materia support as an added complexity layer
+    - Algorithm optimizations
+        - Primary algorithm
+        - Materia algorithm
+    - Food support (technically acts as an extra gear piece)
 
 ## Bugs, Issues & Todo
 
@@ -97,3 +114,6 @@ Implmenting an algorithm that solves for BiS given "targets" and "limits"
 - Frontend:
   - Mobile layout
   - Materia circles assets
+  - Job Resource Gauge assets
+  - IDs for all status effects
+  - Extending rotations, maybe algorithmically?

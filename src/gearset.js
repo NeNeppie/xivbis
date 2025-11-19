@@ -77,6 +77,7 @@ export function convertStatKeys(stats, statsHQ) {
 
 export class Gearset {
   #statsCached = undefined;
+  #refreshOnSet = true;
 
   /** @param {number} level @param {string} jobCode */
   constructor(level, jobCode) {
@@ -93,7 +94,9 @@ export class Gearset {
           },
           set: function (value) {
             this.slots[property] = value;
-            this.#refresh();
+            if (this.#refreshOnSet) {
+              this.#refresh();
+            }
           },
         });
       }
@@ -108,8 +111,10 @@ export class Gearset {
         },
         run: function () {
           this.data = this.simulation();
+          this.dps = this.data;
         },
         data: null,
+        dps: null,
       },
       // TODO: Ability to add/remove simulator instances and modify them
       {
@@ -119,8 +124,10 @@ export class Gearset {
           this.simulator.reset();
           this.simulator.simulate([], 60, 0, true, true);
           this.data = this.simulator.results;
+          this.dps = this.data.dps;
         },
         data: null,
+        dps: null,
       },
     ];
   }
@@ -132,10 +139,22 @@ export class Gearset {
     return this.#statsCached;
   }
 
+  equipMultiple(items) {
+    const tempRefreshFlag = this.#refreshOnSet;
+    this.#refreshOnSet = false;
+    for (const item of items) {
+      if (Object.hasOwn(this, item.gearTypeID) && this[item.gearTypeID]?.id !== item.id) {
+        this[item.gearTypeID] = item;
+      }
+    }
+    this.#refresh();
+    this.#refreshOnSet = tempRefreshFlag;
+  }
+
   #computeStats() {
     let stats = {};
     let slots = Object.getOwnPropertyNames(this).filter((prop) => {
-      return !(prop === "slots" || prop === "level" || prop === "job" || prop === "tribe");
+      return !(prop === "slots" || prop === "level" || prop === "jobCode" || prop === "job" || prop === "tribe");
     });
     for (const slot of slots) {
       const item = this[slot];

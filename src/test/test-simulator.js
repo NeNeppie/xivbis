@@ -280,25 +280,25 @@ describe("Tracker-based Simulator Testing", () => {
       Actions.Nastrond,
       Actions.actRaidenThrust,
       Actions.Stardiver,
-      Actions.actLanceBarrage,
+      Actions.actSpiralBlow,
       Actions.LifeSurge,
       Actions.Starcross,
-      Actions.actHeavensThrust,
+      Actions.actChaoticSpring,
       Actions.MirageDive,
       Actions.RiseoftheDragon,
-      Actions.actFangAndClaw,
+      Actions.actWheelingThrust,
       Actions.actDrakesbane,
       Actions.actRaidenThrust,
       Actions.WyrmwindThrust,
     ];
 
     simulator.reset();
-    simulator.simulate(actions, 60, 0, false, true);
-    console.table(simulator.results.action);
-    console.table(simulator.results.status);
-    console.table(simulator.results.gauge);
-    // simulator.events.forEach((e) => {
-    //   console.dir(e, { depth: 3 });
-    // });
+    simulator.simulate(actions, 60, 0, true, true);
+    // console.table(simulator.results.action);
+    // console.table(simulator.results.status);
+    // console.table(simulator.results.gauge);
+    simulator.results.action.forEach((e) => {
+      console.dir(e, { depth: 3 });
+    });
   });
 });

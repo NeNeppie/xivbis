@@ -30,8 +30,8 @@ export function it(description, func) {
     func();
     logSuccess(description, start);
     return true;
-  } catch {
-    logFailure(description, start);
+  } catch (e) {
+    logFailure(description, start, e);
     return false;
   }
 }
@@ -58,7 +58,7 @@ function logSuccess(description, startTime) {
   console.log(logMessage);
 }
 
-function logFailure(description, startTime) {
+function logFailure(description, startTime, error) {
   const endTime = performance.now();
   let logMessage = `\x1b[1;38;5;88m\u2717\x1b[0m  ${description}`;
   if (testConfig?.logPerformance) {
@@ -66,6 +66,7 @@ function logFailure(description, startTime) {
     logMessage += ` \x1b[33m(${elapsed} ms)\x1b[0m`;
   }
   console.log(logMessage);
+  console.error(error);
 }
 
 export const assert = {

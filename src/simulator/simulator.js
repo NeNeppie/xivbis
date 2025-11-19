@@ -416,6 +416,8 @@ export class StandardSimulation {
   }
 
   finalize() {
+    let totalDamage = { raw: 0, exp: 0 };
+
     // Correcting for timeskip overshooting at the end of a simulation
     this.elapsed = Math.min(this.elapsed, this.fightDuration);
 
@@ -443,7 +445,12 @@ export class StandardSimulation {
         );
 
         dot.damage = { raw: consolidated.raw * dot.tickCount, expected: consolidated.expected * dot.tickCount };
+
+        totalDamage.raw += dot.damage.raw;
+        totalDamage.exp += dot.damage.expected;
       }
+      totalDamage.raw += event.data.damage?.raw ?? 0;
+      totalDamage.exp += event.data.damage?.expected ?? 0;
     });
 
     const gaugeData = this.gauge.finalize();
@@ -453,6 +460,8 @@ export class StandardSimulation {
       action: this.#events,
       status: statusData,
       gauge: gaugeData.records,
+      time: this.elapsed,
+      dps: { raw: totalDamage.raw / this.elapsed, expected: totalDamage.exp / this.elapsed },
     };
 
     return this.results;

@@ -21,11 +21,6 @@ class InfotableBase extends CustomTable {
     }
 
     const simData = simulation.data;
-
-    console.table(simData.action); // DEBUG:
-    console.table(simData.status); // DEBUG:
-    console.table(simData.gauge); // DEBUG:
-
     const filteredRecords = this.filterCallback(simData);
 
     for (const record of filteredRecords) {
@@ -172,7 +167,6 @@ export class StatusInfotable extends InfotableBase {
   }
 }
 
-// TODO: record data acquisition?
 export class GaugeInfotable extends InfotableBase {
   constructor(gearset) {
     super(gearset);

@@ -177,6 +177,18 @@ function mapToGearItem(list) {
   });
 }
 
+export async function fetchItemsGearCustom(jobCode, ilvlMin, ilvlMax) {
+  let filters = [`ClassJobCategory.${jobCode}=1`, "EquipSlotCategory>0"];
+  if (ilvlMin > 0) {
+    filters.push(`LevelItem>=${ilvlMin}`);
+  }
+  if (ilvlMax !== undefined) {
+    filters.push(`LevelItem<=${ilvlMax}`);
+  }
+
+  return fetchItemsGear({ filters: filters }).then(mapToGearItem);
+}
+
 async function fetchItemsGearCurrent(job) {
   return fetchItemsGear({
     filters: ["LevelItem>=690", `ClassJobCategory.${job}=1`, "EquipSlotCategory>0"],

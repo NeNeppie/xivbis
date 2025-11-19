@@ -8,6 +8,11 @@ function calcBaseAttribute(lv, job, tribe, stat) {
   return flr(attribute) + tribeStat;
 }
 
+// yeah I don't know
+export function getBaseSubstat(lv) {
+  return levelModifiers[lv].sub;
+}
+
 export function getBaseStats(lv, job, tribe = "default") {
   // prettier-ignore
   return {
@@ -107,11 +112,32 @@ function getTenacityMultiplier(lv, job, statTNC) {
   return 1;
 }
 
-/** `cooldown` is in seconds. Simplified version */
-function getGlobalCoolDown(lv, statSpeed, baseGCD) {
-  // getSubstatMultiplier() but Ceiled instead of Floored.
-  const speed = cel((130 * (statSpeed - levelModifiers[lv].sub)) / levelModifiers[lv].div);
+/** `baseGCD` is in seconds. Simplified version */
+export function getGlobalCoolDown(lv, statSpeed, baseGCD) {
+  // getSubstatMultiplier() but Ceiled instead of Floored, and negative
+  const speed = cel((130 * (levelModifiers[lv].sub - statSpeed)) / levelModifiers[lv].div);
   return flr((baseGCD * (1000 + speed)) / 1000);
+}
+
+/** returns the minimum and maximum stat points needed to reach a given GCD breakpoint. Arguments are in seconds */
+export function getSpeedStatForGCD(lv, targetGCD, baseGCD = 2.5) {
+  (targetGCD *= 1000), (baseGCD *= 1000);
+
+  const gcdDiff = (baseGCD - targetGCD) / 10;
+  if (gcdDiff === 0) {
+    return { min: levelModifiers[lv].sub, max: levelModifiers[lv].sub };
+  }
+  const baseGCDMult = flr(baseGCD / 10000, 4);
+  const tierStep = 1 / baseGCDMult;
+  const tierPoints = levelModifiers[lv].div / 130;
+
+  // tierStep decimal matters, floored *after* calculation
+  // minimum tier is lower by one than the actual minimum to simplify point calculation
+  const validTiers = [flr(tierStep * (gcdDiff - 1)), flr(tierStep * gcdDiff)];
+  const pointRange = validTiers.map((tier) => {
+    return flr(tier * tierPoints) + levelModifiers[lv].sub;
+  });
+  return { min: pointRange[0] + 1, max: pointRange[1] };
 }
 
 /**
