@@ -8,11 +8,11 @@ export class StandardSimulationDRG extends Simulator {
     this.gauge.createGauge("Firstmind's Focus", { maxCount: 2, initCount: 0 });
   }
 
-  simulate(actionsOverwrite, duration, start = 0, endWhenNoActions = false, simAutoAttacks = true) {
+  simulate(actionsOverwrite, duration, start = 0, endWhenNoActions = false, simAutoAttacks = true, doDamageComputation = true) {
     if (!actionsOverwrite || actionsOverwrite.length === 0) {
-      return super.simulate(this.#actionsDefault, duration, start, endWhenNoActions, simAutoAttacks);
+      return super.simulate(this.#actionsDefault, duration, start, endWhenNoActions, simAutoAttacks, doDamageComputation);
     } else {
-      return super.simulate(actionsOverwrite, duration, start, endWhenNoActions, simAutoAttacks);
+      return super.simulate(actionsOverwrite, duration, start, endWhenNoActions, simAutoAttacks, doDamageComputation);
     }
   }
 

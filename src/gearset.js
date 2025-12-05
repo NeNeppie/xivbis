@@ -27,11 +27,12 @@ export class Gearset {
   #refreshOnSet = true;
 
   /** @param {number} level @param {string} jobCode */
-  constructor(level, jobCode) {
+  constructor(level, jobCode, runSimsOnRefresh = true) {
     this.slots = {}; // a really odd solution for infinite recursion
     this.level = level;
     this.jobCode = jobCode;
     this.job = jobs[jobCode];
+    this.runSimsOnRefresh = runSimsOnRefresh;
 
     ["weapon", "offhand", "head", "body", "hands", "legs", "feet", "ears", "neck", "wrists", "leftring", "rightring"].forEach(
       (property) => {
@@ -69,7 +70,7 @@ export class Gearset {
         simulator: constructJobSpecificSimulator(this, this.jobCode),
         run: function () {
           this.simulator.reset();
-          this.simulator.simulate([], 60, 0, true, true);
+          this.simulator.simulate([], 60, 0, true, true, true);
           this.data = this.simulator.results;
           this.dps = this.data.dps;
         },
@@ -115,8 +116,10 @@ export class Gearset {
 
   #refresh() {
     this.#statsCached = convertStatKeys(this.#computeStats());
-    for (const sim of this.simulations) {
-      sim.run();
+    if (this.runSimsOnRefresh) {
+      for (const sim of this.simulations) {
+        sim.run();
+      }
     }
   }
 }

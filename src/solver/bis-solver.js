@@ -1,7 +1,7 @@
 import { fetchItemsGearCustom } from "../datamanager.js";
 import { GearItem, Gearset } from "../gearset.js";
 import { getBaseSubstat, getSpeedStatForGCD } from "../math-ffxiv.js";
-import { rand } from "../utils/math-utils.js";
+import { cartesianProductCounter, rand, rnd } from "../utils/math-utils.js";
 
 const DEBUG_SLOT_COUNT = 5;
 const DEBUG_SLOT_ARRAY_SIZE = 4;
@@ -103,6 +103,22 @@ export class BestInSlotSolver {
       this.#configJobSpeedStat = "Skill Speed";
     }
 
+    const originalSim = this.#configGearset.simulations.find((sim) => sim.name === simName);
+    if (!originalSim) {
+      console.warning("Couldn't find target simulation attached to gearset. Aborting solver");
+      return false;
+    }
+    this.#configSimulation = {
+      name: "bis solver sim",
+      simulator: originalSim.simulator,
+      run: function () {
+        this.simulator.reset();
+        this.simulator.simulate([], 60, 0, true, true, false);
+        this.data = this.simulator.results;
+      },
+      data: null,
+    };
+
     return true;
   }
 
@@ -195,7 +211,6 @@ export class BestInSlotSolver {
 
   static generateCombinationNew(item, speedStatRange, setSize) {
     const currentSetValues = Object.values(this.#currentSet);
-    const ids = currentSetValues.map((i) => i.id);
 
     if (currentSetValues.length !== setSize) {
       return false;
@@ -216,8 +231,10 @@ export class BestInSlotSolver {
     }
 
     this.#configGearset.equipMultiple(currentSetValues);
-    if (this.#bestRecord?.dps?.expected < this.#configSimulation.dps.expected) {
-      this.#bestRecord = { items: currentSetValues, dps: this.#configSimulation.dps };
+    const dps = this.#configSimulation.simulator.finalizeComputeDamage();
+
+    if (this.#bestRecord?.dps?.expected < dps.expected) {
+      this.#bestRecord = { items: currentSetValues, dps: dps };
     }
 
     return true;
@@ -267,11 +284,6 @@ export class BestInSlotSolver {
   ) {
     this.#resetState();
     if (!this.#setUpSolverConfig(targetLevel, jobCode, targetSimulation)) return;
-    this.#configSimulation = this.#configGearset.simulations.find((sim) => sim.name === targetSimulation);
-    if (!this.#configSimulation) {
-      console.warning("Couldn't find target simulation attached to gearset. Aborting solver");
-      return;
-    }
 
     if (targetIlvls.debug) {
       var allItems = debugRandomiseItems(DEBUG_SLOT_COUNT, DEBUG_SLOT_ARRAY_SIZE, jobCode);
@@ -299,16 +311,14 @@ export class BestInSlotSolver {
     speedStatRange.min -= getBaseSubstat(targetLevel);
     speedStatRange.max -= getBaseSubstat(targetLevel);
 
+    // Run one simulation for each GCD speed and auto attack speed. When "equipping" items, get the matching simulation and compute the actual damage numbers.
+    this.#configSimulation.run();
+
     const startTime = Performance.prototype.now();
     this.solverLoopRecursive(itemArrays, speedStatRange);
     const endTime = Performance.prototype.now();
 
-    // TODO: Reflect actual fetching (inconsistent array sizes)
-    const totalUniqueCombinations = Math.pow(
-      DEBUG_SLOT_ARRAY_SIZE,
-      // ring slot adds 2 arrays
-      DEBUG_SLOT_COUNT >= 10 ? Math.min(DEBUG_SLOT_COUNT + 1, 12) : DEBUG_SLOT_COUNT
-    );
+    const totalUniqueCombinations = cartesianProductCounter(itemArrays);
     return {
       items: itemArrays.flat(1),
       solution: this.#bestRecord,

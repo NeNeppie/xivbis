@@ -1,6 +1,7 @@
 import { GearItem } from "../gearset.js";
 import { getSpeedStatForGCD } from "../math-ffxiv.js";
 import { BestInSlotSolver as Solver } from "../solver/bis-solver.js";
+import { cartesianProductCounter } from "../utils/math-utils.js";
 import { assert, describe, it } from "./test-framework.js";
 
 function parseDebugResults(data) {
@@ -30,6 +31,28 @@ describe("Mathematics and Computations", () => {
     assert.deepEquals(lvHunderedTestThree, { min: 420, max: 420 });
   });
 
+  it("Correct number of Cartesian Product unique combinations", () => {
+    const testArray1 = [
+      [1, 2, 3],
+      [1, 2, 3, 4],
+      [1, 2, 3],
+      [1, 2, 3, 4, 5],
+    ]; // total =?= 180
+
+    const testArray2 = [
+      [1, 2, 3, 4],
+      [1, 2, 3, 4],
+      [1, 2, 3, 4],
+      [1, 2, 3, 4],
+      [1, 2, 3, 4],
+    ]; // total == 1024
+
+    assert.strictEquals(cartesianProductCounter(testArray1), 180);
+    assert.strictEquals(cartesianProductCounter(testArray2), 1024);
+    assert.strictEquals(cartesianProductCounter([[1]]), 1);
+    assert.strictEquals(cartesianProductCounter([[], [], []]), 0);
+    assert.strictEquals(cartesianProductCounter([]), 0);
+  });
   // TODO: Add test for array distribution calculation
 });
 
@@ -60,6 +83,14 @@ describe("Item manipulation", () => {
     assert.strictEquals(item1.stats["Critical Hit"], 176); // unchanged - below threshold
     assert.strictEquals(item1.stats["Direct Hit Rate"], 251); // unchanged - no info
     assert.strictEquals(item1.stats["Piety"], 239);
+  });
+
+  it("Removal of speed stat gear from a sample", () => {
+    let items = [[item1, item2]];
+    items = Solver.eliminateSpeedStatGear(items);
+
+    assert.condition(items[0].length === 1);
+    assert.strictEquals(items[0][0].itemLevel, 760);
   });
 });
 

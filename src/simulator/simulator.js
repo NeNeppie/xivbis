@@ -266,26 +266,13 @@ export class StandardSimulation {
     });
 
     const buffs = this.evaluateBuffs(activeBuffs);
-    const damage =
-      potency !== 0
-        ? calculateDamage(
-            this.gearset.level,
-            this.gearset.jobCode,
-            this.stats,
-            potency,
-            action.type,
-            action.type === "auto" ? true : false,
-            false,
-            buffs
-          )
-        : 0;
-
+    // Damage calculation originally happened at this stage
     this.consumeActiveBuffs(activeBuffs);
 
     let eventData = {
       potency: potency,
-      damage: damage,
       isGCD: action.isGCD,
+      type: action.type,
       applicationDelay: action.applicationTime,
       combo: comboValid,
       effects: activeBuffs,
@@ -362,7 +349,7 @@ export class StandardSimulation {
     this.elapsed += time;
   }
 
-  simulate(actionList, duration, start = 0, endWhenNoActions = false, simAutoAttacks = true) {
+  simulate(actionList, duration, start = 0, endWhenNoActions = false, simAutoAttacks = true, doDamageComputation = true) {
     // this.#actionList = actionList;
 
     // Reassigning recast time in case stats got overwritten
@@ -412,12 +399,14 @@ export class StandardSimulation {
       index++;
     }
 
-    return this.finalize();
+    const results = this.finalize();
+    if (doDamageComputation) {
+      this.finalizeComputeDamage();
+    }
+    return results;
   }
 
   finalize() {
-    let totalDamage = { raw: 0, exp: 0 };
-
     // Correcting for timeskip overshooting at the end of a simulation
     this.elapsed = Math.min(this.elapsed, this.fightDuration);
 
@@ -432,7 +421,28 @@ export class StandardSimulation {
           dot.endTime = this.elapsed;
           dot.duration = dot.endTime - dot.startTime;
         }
+      }
+    });
 
+    const gaugeData = this.gauge.finalize();
+    const statusData = this.status.finalize();
+    this.results = {
+      gaugeInfo: gaugeData.gauges,
+      action: this.#events,
+      status: statusData,
+      gauge: gaugeData.records,
+      time: this.elapsed,
+      dps: null,
+    };
+
+    return this.results;
+  }
+
+  finalizeComputeDamage() {
+    let totalDamage = { raw: 0, exp: 0 };
+
+    this.#events.forEach((event) => {
+      for (const dot of event.data.appliedDot ?? []) {
         const consolidated = calculateDamage(
           this.gearset.level,
           this.gearset.jobCode,
@@ -449,21 +459,26 @@ export class StandardSimulation {
         totalDamage.raw += dot.damage.raw;
         totalDamage.exp += dot.damage.expected;
       }
+
+      event.data.damage =
+        event.data.potency !== 0
+          ? calculateDamage(
+              this.gearset.level,
+              this.gearset.jobCode,
+              this.stats,
+              event.data.potency,
+              event.data.type,
+              event.data.type === "auto" ? true : false,
+              false,
+              event.data.buffs
+            )
+          : 0;
+
       totalDamage.raw += event.data.damage?.raw ?? 0;
       totalDamage.exp += event.data.damage?.expected ?? 0;
     });
 
-    const gaugeData = this.gauge.finalize();
-    const statusData = this.status.finalize();
-    this.results = {
-      gaugeInfo: gaugeData.gauges,
-      action: this.#events,
-      status: statusData,
-      gauge: gaugeData.records,
-      time: this.elapsed,
-      dps: { raw: totalDamage.raw / this.elapsed, expected: totalDamage.exp / this.elapsed },
-    };
-
-    return this.results;
+    this.results.dps = { raw: totalDamage.raw / this.elapsed, expected: totalDamage.exp / this.elapsed };
+    return this.results.dps;
   }
 }

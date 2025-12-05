@@ -7,6 +7,13 @@ export function sumObjectsByKey(...objs) {
   }, {});
 }
 
+export function cartesianProductCounter(array) {
+  if (array.length === 0) return 0;
+  return array.reduce((total, arr) => {
+    return total * arr.length;
+  }, 1);
+}
+
 /** Returns a random integer between `min` and `max`. Both are inclusive.*/
 export function rand(min, max) {
   const minCeiled = Math.ceil(min);
