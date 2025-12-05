@@ -22,6 +22,13 @@ const indexToID = {
 };
 
 // DEBUG:
+const debugIlvlSyncData = {
+  730: { Strength: 4359, Determination: 2774, "Critical Hit": 2774, "Direct Hit Rate": 2774, "Skill Speed": 2774 },
+  735: { Strength: 4485, Determination: 2807, "Critical Hit": 2807, "Direct Hit Rate": 2807, "Skill Speed": 2807 },
+  740: { Strength: 4610, Determination: 2840, "Critical Hit": 2840, "Direct Hit Rate": 2840, "Skill Speed": 2840 },
+};
+
+// DEBUG:
 function debugRandomiseItems(arrayCount, arrayLength, jobCode) {
   let list = [];
   arrayCount = Math.min(arrayCount, 11);
@@ -30,7 +37,7 @@ function debugRandomiseItems(arrayCount, arrayLength, jobCode) {
       let stats = {
         Strength: 10 * rand(1, 9) + 100 * rand(1, 4),
         Determination: 10 * rand(1, 9) + 100 * rand(1, 4),
-        "Critical Hit Rate": 10 * rand(1, 9) + 100 * rand(1, 4),
+        "Critical Hit": 10 * rand(1, 9) + 100 * rand(1, 4),
       };
       if (rand(1, 10) === 5) {
         stats["Skill Speed"] = 10 * rand(1, 9) + 100 * rand(1, 4);
@@ -44,6 +51,7 @@ function debugRandomiseItems(arrayCount, arrayLength, jobCode) {
       list.push({
         name: j,
         id: `100${i}${j}`,
+        itemLevel: 735,
         gearTypeID: indexToID[i],
         gearJob: [jobCode],
         stats: stats,
@@ -57,10 +65,12 @@ function debugRandomiseItems(arrayCount, arrayLength, jobCode) {
 
 export class BestInSlotSolver {
   static #currentSet = {};
+  static #currentSetStats = {};
   static #bestRecord = {};
 
   static #configGearset;
   static #configSimulation;
+  static #configJobSpeedStat;
 
   static #debugTotalIterCount;
   static #debugValidIterCount;
@@ -69,10 +79,10 @@ export class BestInSlotSolver {
   static #debugSpeedHitCount;
 
   static #ignoreNextIteration;
-  static #currentSetSpeedStat;
 
   static #resetState() {
     this.#currentSet = {};
+    this.#currentSetStats = {};
     this.#bestRecord = { dps: { raw: 0, expected: 0 } };
 
     this.#debugTotalIterCount = 0;
@@ -82,14 +92,105 @@ export class BestInSlotSolver {
     this.#debugSpeedHitCount = 0;
 
     this.#ignoreNextIteration = 0;
-    this.#currentSetSpeedStat = 0;
+  }
+
+  static #setUpSolverConfig(level, jobCode, simName) {
+    this.#configGearset = new Gearset(level, jobCode, false);
+    // TODO: While Sps Paladin is not very practical, I want it to be an option.
+    if (["ranged, caster, healer"].includes(this.#configGearset.job.role)) {
+      this.#configJobSpeedStat = "Spell Speed";
+    } else {
+      this.#configJobSpeedStat = "Skill Speed";
+    }
+
+    return true;
   }
 
   static #compareCombinationSpeed(speedStatRange) {
-    if (this.#currentSetSpeedStat < speedStatRange.min || this.#currentSetSpeedStat > speedStatRange.max) {
+    const speedStat = this.#currentSetStats[this.#configJobSpeedStat] ?? 0;
+    if (speedStat < speedStatRange.min || speedStat > speedStatRange.max) {
       return false;
     }
     return true;
+  }
+
+  // FIXME: Change redundant gearset stat update?
+  static #updateSetStats(item) {
+    const prevStats = Object.entries(this.#currentSet[item.gearTypeID]?.stats ?? []);
+    for (const [key, value] of prevStats) {
+      this.#currentSetStats[key] -= value;
+    }
+    for (const [key, value] of Object.entries(item.stats)) {
+      this.#currentSetStats[key] ??= 0;
+      this.#currentSetStats[key] += value;
+    }
+  }
+
+  // FIXME: DT Relics (equal points for both substats) can be interpreted as two separate keys,
+  //    which wrongly allows certain other weapons through the filter (See Phantom vs Veldian spears)
+  static makeStatsHashKey(stats) {
+    const keys = Object.keys(stats);
+    return keys.map((str) => str.substring(0, 5)).join("");
+  }
+
+  /** mutates original array */
+  static sortByStatPoints(items) {
+    return items.sort(
+      (b, a) => Object.values(a.stats).reduce((t, e) => t + e, 0) - Object.values(b.stats).reduce((t, e) => t + e, 0)
+    );
+  }
+
+  /** Eliminates gear that has any speed stat points allocated to it.
+   *  For target gcd speeds that forbid speed stats. */
+  static eliminateSpeedStatGear(groupedItems) {
+    const newItemList = [];
+    groupedItems.forEach((list) => {
+      const newItemListInner = [];
+      for (const item of list) {
+        const keys = Object.keys(item.stats);
+        if (!keys.includes("Skill Speed") && !keys.includes("Spell Speed")) {
+          newItemListInner.push(item);
+        }
+      }
+      newItemList.push(newItemListInner);
+    });
+    return newItemList;
+  }
+
+  /** Removes gear that has lower stat potential within the same gear category
+   * Stat potential - base stats of an item, synced down if need be, plus (TODO:) maximum stat points that can be melded into said item
+   * For gear above the ilvl sync - 0 meld points. otherwise substruct stats of the two items and find if melds can cover the difference. */
+  static eliminateLowStatGear(groupedItems, job, ilvlSync) {
+    const newItemList = [];
+    for (let items of groupedItems) {
+      const newItemListInner = [];
+      let statHashTable = {};
+      items = this.sortByStatPoints(items);
+
+      for (const item of items) {
+        const canMeld = item.itemLevel <= ilvlSync;
+        const hashKey = this.makeStatsHashKey(item.stats);
+
+        if (!Object.hasOwn(statHashTable, hashKey)) {
+          statHashTable[hashKey] = item.stats;
+          newItemListInner.push(item);
+          continue;
+        }
+
+        const statDifference = {};
+        const bestStats = statHashTable[hashKey];
+        for (const [key, value] of Object.entries(bestStats)) {
+          const difference = value - item.stats[key];
+          statDifference[key] = difference;
+          if (difference < 0) {
+            newItemListInner.push(item);
+            break;
+          }
+        }
+      }
+      newItemList.push(newItemListInner);
+    }
+    return newItemList;
   }
 
   static generateCombinationNew(item, speedStatRange, setSize) {
@@ -105,7 +206,14 @@ export class BestInSlotSolver {
       return false;
     }
 
-    // TODO: Left/Right ring "Unique" tag filter
+    if (
+      item.isUnique &&
+      ((item.gearTypeID === "leftring" && this.#currentSet["rightring"].id === item.id) ||
+        (item.gearTypeID === "rightring" && this.#currentSet["leftring"].id === item.id))
+    ) {
+      this.#debugUniqueHitCount++;
+      return false;
+    }
 
     this.#configGearset.equipMultiple(currentSetValues);
     if (this.#bestRecord?.dps?.expected < this.#configSimulation.dps.expected) {
@@ -115,32 +223,12 @@ export class BestInSlotSolver {
     return true;
   }
 
-  // NOTE: 10x10 sample size (1e11) runtime: Unachievable.
-  //       10x4 sample size (4.194m) runtime : 25 min -> 8.6 min (50% spdHit).
-  //       10x3 sample size (177,147) runtime : 1 min -> 19 sec (50% spdHit).
-  //       Array counts above 10 get incremented e.g. 10x10 => 11x10
-  //  Optmizations:
-  //    ✅ remove duplicate iterations aka memoization (now not via memoization!);
-  //      - Cuts down about 50% of iterations.
-  //    ✅ ignore gear combinations not meeting target speeds;
-  //      - Variable, but otherwise theoretically great, performance boost.
-  //      - Extra: add/remove stats on combination assignment instead of fully iterating every single time.
-  //    🔷 Simulate once for each target gcd speed, and only run damage calculation on stat changes;
-  //    🔷 For default target speeds, remove gear from `items` that has any speed stat points;
-  //      - Effectiveness varies, and only for default (2.5) GCD speeds, but offers a substantial boost
-  //    🔷 Remove gear with proportional stat distribution and lower overall stats;
-  //      - Tricking the item count for each array down for extremely large sample sizes
-  //      - Only implement AFTER materia due to ilvl sync
-  //    ✅ ignore gear combinations that do not utilize all available slots;
-  //      - Saves 1-10 iterations. Very insignificant.
   static solverLoopRecursive(items, speedStatRange, index = 0) {
     this.#debugTotalIterCount++;
 
     if (index < items.length) {
       for (const item of items[index]) {
-        // TODO: Differentiate between Skill and Spell speed jobs
-        this.#currentSetSpeedStat -= this.#currentSet[item.gearTypeID]?.stats["Skill Speed"] ?? 0;
-        this.#currentSetSpeedStat += item.stats["Skill Speed"] ?? 0;
+        this.#updateSetStats(item);
         this.#currentSet[item.gearTypeID] = item;
 
         if (this.#ignoreNextIteration > 0) {
@@ -178,8 +266,7 @@ export class BestInSlotSolver {
     itemWhitelist = []
   ) {
     this.#resetState();
-
-    this.#configGearset = new Gearset(targetLevel, jobCode);
+    if (!this.#setUpSolverConfig(targetLevel, jobCode, targetSimulation)) return;
     this.#configSimulation = this.#configGearset.simulations.find((sim) => sim.name === targetSimulation);
     if (!this.#configSimulation) {
       console.warning("Couldn't find target simulation attached to gearset. Aborting solver");
@@ -190,10 +277,18 @@ export class BestInSlotSolver {
       var allItems = debugRandomiseItems(DEBUG_SLOT_COUNT, DEBUG_SLOT_ARRAY_SIZE, jobCode);
     } else {
       var allItems = await fetchItemsGearCustom(jobCode, targetIlvls.min, targetIlvls.max);
+      allItems.forEach((i) => GearItem.syncItemStats(i, debugIlvlSyncData, ilvlSync));
     }
 
     const itemGroups = groupItemsBySlot(jobCode, allItems);
-    const itemArrays = Object.values(itemGroups);
+    let itemArrays = Object.values(itemGroups);
+
+    // TEMP: To replace with an actual check for relevant jobs (e.g. MNK)
+    if (targetSpeed === 2.5) {
+      itemArrays = this.eliminateSpeedStatGear(itemArrays);
+    }
+    itemArrays = this.eliminateLowStatGear(itemArrays, jobCode, ilvlSync);
+
     const itemArraysStringRep = itemArrays.reduce((str, arr) => {
       return str + arr.length + " ";
     }, "");
@@ -215,7 +310,7 @@ export class BestInSlotSolver {
       DEBUG_SLOT_COUNT >= 10 ? Math.min(DEBUG_SLOT_COUNT + 1, 12) : DEBUG_SLOT_COUNT
     );
     return {
-      items: itemArrays,
+      items: itemArrays.flat(1),
       solution: this.#bestRecord,
       debugData: {
         elapsedTime: (endTime - startTime).toFixed(3),

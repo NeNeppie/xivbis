@@ -1,5 +1,5 @@
-import { convertParamToAbbr, convertParamToAbbrSingle } from "../gearset.js";
 import { sumObjectsByKey } from "../utils/math-utils.js";
+import { convertParamsToAbbr, convertParamToAbbr } from "../utils/param-utils.js";
 import { createElementEx, CustomTable } from "./ui-core.js";
 
 const MESSAGE_LOADING = "Loading...";
@@ -107,8 +107,9 @@ class GearTable extends CustomTable {
       {
         name: "WD",
         callback: (data) => {
+          // Keeping `data.statsHQ` in place in case I ever revert to using it
           const stats = sumObjectsByKey(data.stats, data.statsHQ);
-          return Math.max(convertParamToAbbr(stats).WD);
+          return Math.max(convertParamsToAbbr(stats).WD);
         },
         condition: () => this.id === "weapon",
         colWidth: 40,
@@ -119,7 +120,7 @@ class GearTable extends CustomTable {
 
     for (const stat of statList) {
       this.customHeaders.push({
-        name: convertParamToAbbrSingle(stat),
+        name: convertParamToAbbr(stat),
         callback: (data) => {
           const stats = sumObjectsByKey(data.stats, data.statsHQ);
           return stats[stat] ?? 0;

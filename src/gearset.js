@@ -1,7 +1,8 @@
 import { jobs } from "./constants/job-consts.js";
 import { calculateDamage, getBaseStats } from "./math-ffxiv.js";
 import { constructJobSpecificSimulator } from "./simulator/simulator-constructor.js";
-import { sumObjectsByKey } from "./utils/math-utils.js";
+import { rnd, sumObjectsByKey } from "./utils/math-utils.js";
+import { convertStatKeys } from "./utils/param-utils.js";
 
 export const GearpieceStatDistribution = {
   1: { name: "Mainhand", id: "weapon", percentage: 100 }, // Mainhand (PLD Sword, One-handed WHM and BLM wands)
@@ -19,61 +20,7 @@ export const GearpieceStatDistribution = {
   15: { name: "Head + Body", id: "body", percentage: 220 }, // Head + Body (e.g. Eureka Caster Robe)
   16: { name: "Suit", id: "body", percentage: 440 }, // All but Head (ARR Suits, Mogstation pieces)
   18: { name: "Legs + Feet", id: "legs", percentage: 220 }, // Legs + Feet (VERY few exist)
-};
-
-// prettier-ignore
-const paramConvertMap = {
-  "Vitality":         {code: "VIT", key: "vitality"},
-  "Strength":         {code: "STR", key: "strength"},
-  "Dexterity":        {code: "DEX", key: "dexterity"},
-  "Intelligence":     {code: "INT", key: "intelligence"},
-  "Mind":             {code: "MND", key: "mind"},
-  "Determination":    {code: "DET", key: "determination"},
-  "Tenacity":         {code: "TNC", key: "tenacity"},
-  "Piety":            {code: "PIE", key: "piety"},
-  "Critical Hit":     {code: "CRT", key: "crit"},
-  "Direct Hit Rate":  {code: "DH",  key: "directHit"},
-  "Skill Speed":      {code: "SKS", key: "spdSkill"},
-  "Spell Speed":      {code: "SPS", key: "spdSpell"},
-  "Physical Damage":  {code: "WD",  key: "wdPhys"},
-  "Magic Damage":     {code: "WD",  key: "wdMag"},
-  "Attack Delay":     {code: "AA",  key: "delay"},
-  "Defense":          {code: "DEF", key: "defPhys"},
-  "Magic Defense":    {code: "DEF", key: "defMag"},
-  // "Block Rate",
-  // "Block Strength",
-};
-
-export function convertParamToAbbr(obj) {
-  let translated = {};
-
-  for (const [key, value] of Object.entries(obj)) {
-    // Keep the higher value, in case of stats which share an abbreviation
-    translated[paramConvertMap[key].code] =
-      translated[paramConvertMap[key].code] > value ? translated[paramConvertMap[key].code] : value;
-  }
-  return translated;
-}
-
-export function convertParamToAbbrSingle(paramKey) {
-  return paramConvertMap[paramKey].code;
-}
-
-export function convertStatKeys(stats, statsHQ) {
-  let translated = {};
-
-  for (const [key, value] of Object.entries(paramConvertMap)) {
-    translated[value.key] = stats[key] ?? 0;
-  }
-
-  // Passing HQ stats treats the item as its HQ variant.
-  if (statsHQ !== undefined) {
-    for (const [key, value] of Object.entries(statsHQ)) {
-      translated[paramConvertMap[key].key] += value;
-    }
-  }
-  return translated;
-}
+}; // High = percentage. Low = rnd(percentage * 0.7)
 
 export class Gearset {
   #statsCached = undefined;
@@ -161,8 +108,7 @@ export class Gearset {
       if (item == null) {
         continue;
       }
-      // If an item has HQ stats, they're combined as well.
-      stats = sumObjectsByKey(stats, item.stats, item.statsHQ);
+      stats = sumObjectsByKey(stats, item.stats);
     }
     return sumObjectsByKey(stats, getBaseStats(this.level, this.jobCode, this.tribe ?? "default"));
   }
@@ -196,51 +142,67 @@ export class GearItem {
     this.isUnique = item.IsUnique;
     this.gearTypeName = GearpieceStatDistribution[equipmentID].name;
     this.gearTypeID = GearpieceStatDistribution[equipmentID].id;
+    this.slotStatPercentage = GearpieceStatDistribution[equipmentID].percentage;
     this.gearJob = item.ClassJobCategory.fields.Name.split(" ");
 
-    ({ stats: this.stats, statsHQ: this.statsHQ } = GearItem.#extractStats(item));
+    this.stats = GearItem.#extractStats(item);
   }
 
-  static #extractStats(item) {
+  static syncItemStats(item, ilvlSyncParams, ilvl) {
+    if (typeof ilvlSyncParams[ilvl] === "undefined") return;
+
+    const statSyncValues = ilvlSyncParams[ilvl];
+    for (const stat in item.stats) {
+      if (Object.hasOwn(statSyncValues, stat)) {
+        const cap = rnd(statSyncValues[stat] * 0.001 * item.slotStatPercentage);
+        item.stats[stat] = Math.min(cap, item.stats[stat]);
+      }
+    }
+  }
+
+  // TODO: convert from base to key immediately instead of on gearset assignment
+  static #extractStats(itemRaw) {
     let stats = {};
-    let statsHQ = {};
     for (let i = 0; i < 5; i++) {
-      const param = item.BaseParam[i];
-      const paramValue = item.BaseParamValue[i];
+      const param = itemRaw.BaseParam[i];
+      const paramValue = itemRaw.BaseParamValue[i];
 
       if (param.fields.Name) {
         stats[param.fields.Name] = paramValue;
       }
     }
 
-    switch (item.EquipSlotCategory.value) {
+    switch (itemRaw.EquipSlotCategory.value) {
       case 1:
       case 13:
-        stats["Physical Damage"] = item.DamagePhys;
-        stats["Magic Damage"] = item.DamageMag;
-        stats["Attack Delay"] = item.Delayms;
+        stats["Physical Damage"] = itemRaw.DamagePhys;
+        stats["Magical Damage"] = itemRaw.DamageMag;
+        stats["Attack Delay"] = itemRaw.Delayms;
         break;
       case 2:
-        stats["Block Strength"] = item.Block;
-        stats["Block Rate"] = item.BlockRate;
+        stats["Block Strength"] = itemRaw.Block;
+        stats["Block Rate"] = itemRaw.BlockRate;
         break;
       default:
-        stats["Defense"] = item.DefensePhys;
-        stats["Magic Defense"] = item.DefenseMag;
+        stats["Defense"] = itemRaw.DefensePhys;
+        stats["Magic Defense"] = itemRaw.DefenseMag;
         break;
     }
 
-    if (item.CanBeHq) {
+    // Items with HQ variants are treated as HQ
+    if (itemRaw.CanBeHq) {
       for (let i = 0; i < 6; i++) {
-        const paramSpecial = item.BaseParamSpecial[i];
-        const paramValueSpecial = item.BaseParamValueSpecial[i];
+        const paramSpecial = itemRaw.BaseParamSpecial[i];
+        const paramValueSpecial = itemRaw.BaseParamValueSpecial[i];
 
         if (paramSpecial !== undefined && paramSpecial.row_id !== undefined) {
-          statsHQ[paramSpecial.fields.Name] = paramValueSpecial;
+          if (paramSpecial.fields.Name === "Magic Damage") {
+            paramSpecial.fields.Name = "Magical Damage";
+          }
+          stats[paramSpecial.fields.Name] += paramValueSpecial;
         }
       }
-      return { stats: stats, statsHQ: statsHQ };
     }
-    return { stats };
+    return stats;
   }
 }
