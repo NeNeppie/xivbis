@@ -110,8 +110,8 @@ describe("Tracker-based Simulator Testing", () => {
         const statusEvent = eventsStatus.find((e) => e.startTime === 2.5);
         const actionEvent = eventsAction.find((e) => e.elapsed === 2.5);
 
-        assert.partialDeepEquals({ name: "Power Surge" }, statusEvent);
-        assert.partialDeepEquals({ damage: 0 }, actionEvent.data.buffs);
+        assert.partialDeepEquals(statusEvent, { name: "Power Surge" });
+        assert.partialDeepEquals(actionEvent.data.buffs, { damage: 0 });
       }),
 
       // According to logs: Effects apply on use, damage and dots apply after applicationTime
@@ -181,30 +181,30 @@ describe("Tracker-based Simulator Testing", () => {
         // Test for Life Surge on Chaotic Spring making it a guaranteed crit
         const event = eventsAction.find((e) => e.name === "Chaotic Spring");
         assert.condition(event.data.effects.find((e) => e.name === "Life Surge"));
-        assert.partialDeepEquals({ autocrit: true }, event.data.buffs);
+        assert.partialDeepEquals(event.data.buffs, { autocrit: true });
       }),
 
       it("Multiple damage buffs stacking", () => {
         // Test for { 0.21 damage, 0.1 crit } buff on first Wheeling Thrust
         const event = eventsAction.find((e) => e.name === "Wheeling Thrust");
-        assert.partialDeepEquals({ damage: 0.21, crit: 0.1 }, event.data.buffs);
+        assert.partialDeepEquals(event.data.buffs, { damage: 0.21, crit: 0.1 });
       }),
 
       it("Only primary buff type should snapshot to DoTs", () => {
         // Test for 'damage', 'crit' and 'direct' existing while Life Surge status type does not
         const chaotic = eventsAction.find((e) => e.name === "Chaotic Spring");
-        assert.deepEquals({ damage: 0.1, crit: 0.1, direct: 0, autocrit: true, autodirect: false }, chaotic.data.buffs);
-        assert.deepEquals({ damage: 0.1, crit: 0.1, direct: 0 }, chaotic.data.appliedDot[0].buffs);
+        assert.deepEquals(chaotic.data.buffs, { damage: 0.1, crit: 0.1, direct: 0, autocrit: true, autodirect: false });
+        assert.deepEquals(chaotic.data.appliedDot[0].buffs, { damage: 0.1, crit: 0.1, direct: 0 });
       }),
 
       it("Buffs applying according to restrictions", () => {
         // Test Life Surge proccing on a GCD (Weaponskill) and not OGCD
         const index = eventsAction.indexOf(eventsAction.find((e) => e.name === "Life Surge"));
 
-        assert.strictEquals("Battle Litany", eventsAction[index + 1].name);
-        assert.partialDeepEquals({ autocrit: false }, eventsAction[index + 1].data.buffs);
-        assert.strictEquals("Chaotic Spring", eventsAction[index + 2].name);
-        assert.partialDeepEquals({ autocrit: true }, eventsAction[index + 2].data.buffs);
+        assert.strictEquals(eventsAction[index + 1].name, "Battle Litany");
+        assert.partialDeepEquals(eventsAction[index + 1].data.buffs, { autocrit: false });
+        assert.strictEquals(eventsAction[index + 2].name, "Chaotic Spring");
+        assert.partialDeepEquals(eventsAction[index + 2].data.buffs, { autocrit: true });
       }),
 
       it("Buffs with stacks getting used up correctly", () => {
@@ -212,14 +212,14 @@ describe("Tracker-based Simulator Testing", () => {
         const chaotic = eventsAction.find((e) => e.name === "Chaotic Spring");
         const thrust = eventsAction.find((e) => e.name === "Wheeling Thrust");
 
-        assert.partialDeepEquals({ autocrit: true }, chaotic.data.buffs);
-        assert.partialDeepEquals({ autocrit: false }, thrust.data.buffs);
+        assert.partialDeepEquals(chaotic.data.buffs, { autocrit: true });
+        assert.partialDeepEquals(thrust.data.buffs, { autocrit: false });
       }),
 
       it("Buffs getting refreshed correctly", () => {
         // Test Life Surge proccing on Drakesbane after being previously applied on Chaotic Spring
         const drakesbane = eventsAction.find((e) => e.name === "Drakesbane");
-        assert.partialDeepEquals({ autocrit: true }, drakesbane.data.buffs);
+        assert.partialDeepEquals(drakesbane.data.buffs, { autocrit: true });
       }),
 
       it("Buffs' duration is dependant on their usage", () => {
@@ -293,12 +293,13 @@ describe("Tracker-based Simulator Testing", () => {
     ];
 
     simulator.reset();
-    simulator.simulate(actions, 60, 0, true, true);
-    // console.table(simulator.results.action);
-    // console.table(simulator.results.status);
-    // console.table(simulator.results.gauge);
-    simulator.results.action.forEach((e) => {
-      console.dir(e, { depth: 3 });
-    });
+    simulator.simulate(actions, 60, 0, true, true, true);
+    console.table(simulator.results.action);
+    console.table(simulator.results.status);
+    console.table(simulator.results.gauge);
+    // simulator.results.action.forEach((e) => {
+    //   console.dir(e, { depth: 3 });
+    // });
+    console.log(simulator.results.dps);
   });
 });

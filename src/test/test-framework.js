@@ -76,19 +76,19 @@ export const assert = {
     }
   },
 
-  equals: function (expected, actual) {
+  equals: function (actual, expected) {
     if (expected != actual) {
       throw new Error();
     }
   },
 
-  strictEquals: function (expected, actual) {
+  strictEquals: function (actual, expected) {
     if (expected !== actual) {
       throw new Error();
     }
   },
 
-  deepEquals: function (expected, actual) {
+  deepEquals: function (actual, expected) {
     const jsonExpected = JSON.stringify(expected);
     const jsonActual = JSON.stringify(actual);
 
@@ -97,7 +97,7 @@ export const assert = {
     }
   },
 
-  partialDeepEquals: function (expected, actual) {
+  partialDeepEquals: function (actual, expected) {
     const deepLoopKeys = (obj1, obj2) => {
       let result = {};
       for (const k in obj1) {

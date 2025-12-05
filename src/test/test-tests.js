@@ -46,7 +46,7 @@ describe("Unit Testing the Unit Tester", () => {
   });
 
   it("Correctly compares a select portion of an object", () => {
-    assert.partialDeepEquals({ a: 1, c: { d: 4 } }, { a: 1, b: 2, c: { e: 5, d: 4 } });
+    assert.partialDeepEquals({ a: 1, b: 2, c: { e: 5, d: 4 } }, { a: 1, c: { d: 4 } });
   });
 });
 
