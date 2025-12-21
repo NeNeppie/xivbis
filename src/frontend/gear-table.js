@@ -58,17 +58,17 @@ export class GearTableContainer {
 }
 
 const statList = [
-  "Strength",
-  "Dexterity",
-  "Intelligence",
-  "Mind",
-  "Determination",
-  "Tenacity",
-  "Piety",
-  "Critical Hit",
-  "Direct Hit Rate",
-  "Skill Speed",
-  "Spell Speed",
+  "strength",
+  "dexterity",
+  "intelligence",
+  "mind",
+  "determination",
+  "tenacity",
+  "piety",
+  "crit",
+  "directHit",
+  "spdSkill",
+  "spdSpell",
 ];
 
 class GearTable extends CustomTable {

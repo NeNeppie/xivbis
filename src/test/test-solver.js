@@ -98,11 +98,6 @@ await describe("Solver Testing, randomised items", async () => {
   const results = await Solver.solve("DRG", 100, { min: 730, max: 735, debug: true }, 2.5, "standard", 735);
   parseDebugResults(results);
 
-  // const sksItems = [];
-  // results.items.map((arr) => {
-  //   sksItems.push(arr.filter((item) => item.stats["Skill Speed"]));
-  // });
-
   it("Total iteration count matches unique no. of combinations", () => {
     const totalValidIter = results.debugData.iterationCount + results.debugData.speedHitCount + results.debugData.uniqueHitCount;
     assert.strictEquals(totalValidIter, results.debugData.algorithmCombinationCount);

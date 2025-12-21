@@ -16,18 +16,18 @@ export function getBaseSubstat(lv) {
 export function getBaseStats(lv, job, tribe = "default") {
   // prettier-ignore
   return {
-    "Strength": calcBaseAttribute(lv, job, tribe, "strength"),
-    "Dexterity": calcBaseAttribute(lv, job, tribe, "dexterity"),
-    "Intelligence": calcBaseAttribute(lv, job, tribe, "intelligence"),
-    "Mind": calcBaseAttribute(lv, job, tribe, "mind"),
-    "Vitality": calcBaseAttribute(lv, job, tribe, "vitality"),
-    "Determination": levelModifiers[lv].main,
-    "Tenacity": levelModifiers[lv].sub,
-    "Critical Hit": levelModifiers[lv].sub,
-    "Direct Hit Rate": levelModifiers[lv].sub,
-    "Skill Speed": levelModifiers[lv].sub,
-    "Spell Speed": levelModifiers[lv].sub,
-    "Piety": levelModifiers[lv].sub,
+    "strength": calcBaseAttribute(lv, job, tribe, "strength"),
+    "dexterity": calcBaseAttribute(lv, job, tribe, "dexterity"),
+    "intelligence": calcBaseAttribute(lv, job, tribe, "intelligence"),
+    "mind": calcBaseAttribute(lv, job, tribe, "mind"),
+    "vitality": calcBaseAttribute(lv, job, tribe, "vitality"),
+    "determination": levelModifiers[lv].main,
+    "tenacity": levelModifiers[lv].sub,
+    "crit": levelModifiers[lv].sub,
+    "directHit": levelModifiers[lv].sub,
+    "spdSkill": levelModifiers[lv].sub,
+    "spdSpell": levelModifiers[lv].sub,
+    "piety": levelModifiers[lv].sub,
   };
 }
 

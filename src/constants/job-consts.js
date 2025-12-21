@@ -4,7 +4,7 @@ const TANK_CONSTS = {
   autoStat: "strength",
   autoPotency: 90,
   traitBonus: 1,
-  statBlacklist: ["Dexterity", "Intelligence", "Mind", "Piety", "Spell Speed"],
+  statBlacklist: ["dexterity", "intelligence", "mind", "piety", "spdSpell"],
 };
 
 const MELEE_CONSTS = {
@@ -13,7 +13,7 @@ const MELEE_CONSTS = {
   autoStat: "strength",
   autoPotency: 90,
   traitBonus: 1,
-  statBlacklist: ["Dexterity", "Intelligence", "Mind", "Piety", "Spell Speed", "Tenacity"],
+  statBlacklist: ["dexterity", "intelligence", "mind", "piety", "spdSpell", "tenacity"],
 };
 
 const MELEE_SCOUTING_CONSTS = {
@@ -22,7 +22,7 @@ const MELEE_SCOUTING_CONSTS = {
   autoStat: "dexterity",
   autoPotency: 90,
   traitBonus: 1,
-  statBlacklist: ["Strength", "Intelligence", "Mind", "Piety", "Spell Speed", "Tenacity"],
+  statBlacklist: ["strength", "intelligence", "mind", "piety", "spdSpell", "tenacity"],
 };
 
 const RANGED_CONSTS = {
@@ -31,7 +31,7 @@ const RANGED_CONSTS = {
   autoStat: "dexterity",
   autoPotency: 80,
   traitBonus: 1.2,
-  statBlacklist: ["Strength", "Intelligence", "Mind", "Piety", "Spell Speed", "Tenacity"],
+  statBlacklist: ["strength", "intelligence", "mind", "piety", "spdSpell", "tenacity"],
 };
 
 const CASTER_CONSTS = {
@@ -40,7 +40,7 @@ const CASTER_CONSTS = {
   autoStat: "strength",
   autoPotency: 90,
   traitBonus: 1.3,
-  statBlacklist: ["Strength", "Dexterity", "Mind", "Piety", "Skill Speed", "Tenacity"],
+  statBlacklist: ["strength", "dexterity", "mind", "piety", "spdSkill", "tenacity"],
 };
 
 // Strength is on Caster's and Healer's blacklist because the only way to increase it
@@ -52,11 +52,11 @@ const HEALER_CONSTS = {
   autoStat: "strength",
   autoPotency: 90,
   traitBonus: 1.3,
-  statBlacklist: ["Strength", "Dexterity", "Intelligence", "Skill Speed", "Tenacity"],
+  statBlacklist: ["strength", "dexterity", "intelligence", "spdSkill", "tenacity"],
 };
 
 export const jobs = {
-  PLD: { ...TANK_CONSTS, displayName: "Paladin", statBlacklist: ["Dexterity", "Intelligence", "Mind", "Piety"] },
+  PLD: { ...TANK_CONSTS, displayName: "Paladin", statBlacklist: ["dexterity", "intelligence", "mind", "piety"] },
   WAR: { ...TANK_CONSTS, displayName: "Warrior" },
   DRK: { ...TANK_CONSTS, displayName: "Dark Knight" },
   GNB: { ...TANK_CONSTS, displayName: "Gunbreaker" },

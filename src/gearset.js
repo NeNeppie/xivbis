@@ -2,7 +2,7 @@ import { jobs } from "./constants/job-consts.js";
 import { calculateDamage, getBaseStats } from "./math-ffxiv.js";
 import { constructJobSpecificSimulator } from "./simulator/simulator-constructor.js";
 import { rnd, sumObjectsByKey } from "./utils/math-utils.js";
-import { convertStatKeys } from "./utils/param-utils.js";
+import { exdIdToKey, exdStatsByIds } from "./utils/param-utils.js";
 
 export const GearpieceStatDistribution = {
   1: { name: "Mainhand", id: "weapon", percentage: 100 }, // Mainhand (PLD Sword, One-handed WHM and BLM wands)
@@ -82,7 +82,7 @@ export class Gearset {
 
   get stats() {
     if (!this.#statsCached) {
-      this.#statsCached = convertStatKeys(this.#computeStats());
+      this.#statsCached = this.#computeStats();
     }
     return this.#statsCached;
   }
@@ -115,7 +115,7 @@ export class Gearset {
   }
 
   #refresh() {
-    this.#statsCached = convertStatKeys(this.#computeStats());
+    this.#statsCached = this.#computeStats();
     if (this.runSimsOnRefresh) {
       for (const sim of this.simulations) {
         sim.run();
@@ -163,32 +163,32 @@ export class GearItem {
     }
   }
 
-  // TODO: convert from base to key immediately instead of on gearset assignment
   static #extractStats(itemRaw) {
     let stats = {};
     for (let i = 0; i < 5; i++) {
       const param = itemRaw.BaseParam[i];
       const paramValue = itemRaw.BaseParamValue[i];
 
-      if (param.fields.Name) {
-        stats[param.fields.Name] = paramValue;
+      const paramKey = exdIdToKey(param.row_id);
+      if (paramKey) {
+        stats[paramKey] = paramValue;
       }
     }
 
     switch (itemRaw.EquipSlotCategory.value) {
       case 1:
       case 13:
-        stats["Physical Damage"] = itemRaw.DamagePhys;
-        stats["Magical Damage"] = itemRaw.DamageMag;
-        stats["Attack Delay"] = itemRaw.Delayms;
+        stats["wdPhys"] = itemRaw.DamagePhys;
+        stats["wdMag"] = itemRaw.DamageMag;
+        stats["delay"] = itemRaw.Delayms;
         break;
       case 2:
-        stats["Block Strength"] = itemRaw.Block;
-        stats["Block Rate"] = itemRaw.BlockRate;
+        stats["blockStr"] = itemRaw.Block;
+        stats["blockRate"] = itemRaw.BlockRate;
         break;
       default:
-        stats["Defense"] = itemRaw.DefensePhys;
-        stats["Magic Defense"] = itemRaw.DefenseMag;
+        stats["defPhys"] = itemRaw.DefensePhys;
+        stats["defMag"] = itemRaw.DefenseMag;
         break;
     }
 
@@ -199,13 +199,32 @@ export class GearItem {
         const paramValueSpecial = itemRaw.BaseParamValueSpecial[i];
 
         if (paramSpecial !== undefined && paramSpecial.row_id !== undefined) {
-          if (paramSpecial.fields.Name === "Magic Damage") {
-            paramSpecial.fields.Name = "Magical Damage";
+          const paramSpecialKey = exdIdToKey(paramSpecial.row_id);
+          if (paramSpecialKey) {
+            stats[paramSpecialKey] ??= 0;
+            stats[paramSpecialKey] += paramValueSpecial;
           }
-          stats[paramSpecial.fields.Name] += paramValueSpecial;
         }
       }
     }
     return stats;
+  }
+}
+
+export class MateriaItem {
+  constructor(materiaRaw, materiaTier, paramId, baseParamValue) {
+    this.id = materiaRaw.ID;
+    this.name = materiaRaw.Name;
+    this.iconPath = materiaRaw.Icon.path_hr1;
+    this.itemLevel = materiaRaw.LevelItem.value;
+
+    this.tier = materiaTier;
+    this.isHighMateria = materiaTier > 5 && materiaTier % 2 === 0;
+
+    this.stats = this.#assignStat(paramId, baseParamValue);
+  }
+
+  #assignStat(baseParam, value) {
+    return exdStatsByIds({ [baseParam]: value });
   }
 }
